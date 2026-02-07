@@ -1,0 +1,44 @@
+# Binaries & tools
+bin/
+act_*
+~/.local/bin/act
+
+# macOS junk
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor/IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Python / temp
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
+.env.local
+
+# Logs & temp
+*.log
+tmp/
+.devcontainer/domains.log
+
+# Devcontainer local overrides
+.devcontainer/*.local.json
+.devcontainer/.build/
+
+# Claude / MCP / Serena local state
+.claude/
+.serena/
+*.mcp.json
+.mcp.local.json
+
+# act caches / artifacts
+.act/

@@ -1,0 +1,11 @@
+{
+  "action": "opened",
+  "number": 999,
+  "pull_request": {
+    "title": "feat: dummy for local test",
+    "number": 999,
+    "head": { "ref": "feat/test" },
+    "base": { "ref": "main" }
+  },
+  "act": true
+}
