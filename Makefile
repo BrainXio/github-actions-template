@@ -1,6 +1,5 @@
 # Makefile – developer workflow commands for github-actions-template
 # Environment bootstrapping moved to .devcontainer/setup.sh
-# (called automatically via postCreateCommand in devcontainer.json)
 
 ACT_VERSION    ?= v0.2.84
 ACT_BIN        := ~/.local/bin/act
@@ -14,7 +13,7 @@ help: ## Show this help
 
 all: lint check-secrets test-push ## Recommended CI-like validation sequence
 
-setup: ## Run full environment setup (idempotent) – usually auto-called by devcontainer
+setup: ## Run full environment setup (idempotent)
 	@bash .devcontainer/setup.sh
 
 lint: ## Run shellcheck on bash scripts
@@ -29,7 +28,7 @@ check-secrets: pre-commit-install ## Run pre-commit secret scan + basic regex ch
 	@pre-commit run detect-secrets --all-files || { echo "Secret scan failed"; exit 1; }
 	@echo "Secret check passed"
 
-pre-commit-install: ## Install pre-commit hooks (idempotent)
+pre-commit-install: ## Install pre-commit git hooks
 	@pre-commit install --install-hooks && echo "pre-commit hooks installed"
 
 pre-commit-run: ## Run all pre-commit hooks on all files
@@ -40,27 +39,40 @@ pre-commit-update: ## Update pre-commit hook versions
 
 validate: ## Dry-run validation via act (if action.yml exists)
 	@if [ -f action.yml ]; then \
-		$(ACT_BIN) --dryrun --workflow .github/workflows/test-action.yml; \
+		$(ACT_BIN) --dryrun -W .github/workflows/ci.yml $(ACT_ARGS); \
 	else \
 		echo "No action.yml yet — skipping"; \
 	fi
 
 # ────────────────────────────────────────────────────────────────────────────────
-# act test targets (depend on act being available)
+# act test targets – now correctly handles events
 # ────────────────────────────────────────────────────────────────────────────────
 
-test-%: setup ## Generic test runner (make test-push, test-dispatch, etc.)
-	@$(ACT_BIN) $(subst test-,,$@) \
-		$(if $(filter test-main,$@),--eventpath .github/events/push-main.json,) \
-		$(if $(filter test-pr,$@),--eventpath .github/events/pull-request-local.json,) \
-		-W .github/workflows/test-action.yml $(ACT_ARGS)
+test-push: ## Test push event (default)
+	@$(ACT_BIN) push -W .github/workflows/ci.yml $(ACT_ARGS)
 
-test-push test-dispatch test-pr test-issues test-main test-release test-schedule: test-%
+test-dispatch: ## Test manual workflow_dispatch
+	@$(ACT_BIN) workflow_dispatch -W .github/workflows/ci.yml $(ACT_ARGS)
 
-tests: test-push test-dispatch test-pr test-issues test-main ## Run most common event tests
+test-pr: ## Test pull_request event
+	@$(ACT_BIN) pull_request --eventpath .github/events/pull-request-local.json -W .github/workflows/ci.yml $(ACT_ARGS)
+
+test-issues: ## Test issues event
+	@$(ACT_BIN) issues -W .github/workflows/ci.yml $(ACT_ARGS)
+
+test-main: ## Test push to main branch
+	@$(ACT_BIN) push --eventpath .github/events/push-main.json -W .github/workflows/ci.yml $(ACT_ARGS)
+
+test-release: ## Test release published
+	@$(ACT_BIN) release -W .github/workflows/ci.yml $(ACT_ARGS)
+
+test-schedule: ## Test scheduled event
+	@$(ACT_BIN) schedule -W .github/workflows/ci.yml $(ACT_ARGS)
+
+tests: test-push test-dispatch test-pr test-issues test-main ## Run most common tests
 
 clean: ## Remove temporary files
 	rm -rf tmp/ .act/
 
-purge: clean ## Alias + more aggressive clean if needed
+purge: clean ## Alias + more aggressive clean
 	rm -f .secrets.baseline.bak

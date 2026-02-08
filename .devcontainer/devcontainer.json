@@ -16,6 +16,9 @@
 		},
 		"ghcr.io/devcontainers/features/github-cli:1": {
 			"version": "latest"
+		},
+		"ghcr.io/devcontainers/features/python:1": {
+			"version": "latest"
 		}
 	},
 

@@ -1,0 +1,54 @@
+name: Issue Triage
+
+on:
+  issues:
+    types: [opened, reopened]
+
+permissions:
+  issues: write          # to add labels and post comments
+  contents: read         # minimal needed
+
+jobs:
+  triage:
+    name: Auto-triage new issues
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Add 'investigate' label
+        uses: actions/github-script@v7
+        if: github.event.action == 'opened' || github.event.action == 'reopened'
+        with:
+          script: |
+            const issue = context.payload.issue;
+
+            // Skip if already labeled
+            if (issue.labels.some(l => l.name === 'investigate')) {
+              return;
+            }
+
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              labels: ['investigate']
+            });
+
+      - name: Post welcome comment
+        uses: peter-evans/create-or-update-comment@v4
+        if: github.event.action == 'opened' || github.event.action == 'reopened'
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            Thanks for opening this issue! 🙌
+
+            We've added the **investigate** label so the team knows it needs attention. Someone will review it soon.
+
+            In the meantime:
+            - Add more details (logs, screenshots, repro steps) if possible
+            - Check our [Contributing Guide](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md)
+
+            Appreciate your help making the project better!
+
+            – The maintainers
