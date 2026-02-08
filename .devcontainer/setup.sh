@@ -34,6 +34,13 @@ if ! command -v shellcheck >/dev/null; then
     fi
 fi
 
+# pipx (for detect-secrets etc.)
+if ! command -v pipx >/dev/null; then
+    echo "  Installing pipx ..."
+    python3 -m pip install --user pipx
+    python3 -m pipx ensurepath
+fi
+
 # detect-secrets baseline
 if ! pipx list | grep -q detect-secrets; then
     echo "  Installing detect-secrets via pipx ..."
@@ -46,6 +53,14 @@ if [[ -f .secrets.baseline ]]; then
 else
     echo "  Creating initial secrets baseline ..."
     detect-secrets scan > .secrets.baseline
+fi
+
+# Install pre-commit via pipx (isolated CLI)
+if ! pipx list | grep -q pre-commit; then
+    echo "  Installing pre-commit via pipx ..."
+    pipx install pre-commit
+else
+    echo "  pre-commit already installed via pipx"
 fi
 
 # pre-commit hooks
@@ -72,13 +87,13 @@ sudo apt-get update -qq && \
 
 # Firewall
 echo "  Applying strict outbound firewall ..."
-sudo -E ./init-firewall.sh
+sudo -E ./.devcontainer/init-firewall.sh
 
 # Claude + MCP
 if ! command -v claude >/dev/null; then
     echo "  Installing Claude Code ..."
     curl -fsSL https://claude.ai/install.sh | bash
-    ./init-mcp.sh
+    ./.devcontainer/init-mcp.sh
 else
     echo "  Claude already installed"
 fi

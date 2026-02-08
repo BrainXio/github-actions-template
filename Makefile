@@ -29,9 +29,6 @@ check-secrets: pre-commit-install ## Run pre-commit secret scan + basic regex ch
 	@pre-commit run detect-secrets --all-files || { echo "Secret scan failed"; exit 1; }
 	@echo "Secret check passed"
 
-pre-commit-install: ## Install pre-commit hooks (idempotent)
-	@pre-commit install --install-hooks && echo "pre-commit hooks installed"
-
 pre-commit-run: ## Run all pre-commit hooks on all files
 	@pre-commit run --all-files
 
