@@ -1,0 +1,25 @@
+name: 'Hello World Template'
+description: 'Simple hello-world composite action template'
+author: 'BrainXio'
+
+branding:
+  icon: 'refresh-cw'
+  color: 'purple'
+
+inputs:
+  who-to-greet:
+    description: 'Name to greet'
+    required: false
+    default: 'World'
+
+outputs:
+  time:
+    description: 'The time we greeted you'
+
+runs:
+  using: 'composite'
+  steps:
+    - run: ${{ github.action_path }}/src/entrypoint.sh
+      shell: bash
+      env:
+        INPUT_WHO_TO_GREET: ${{ inputs.who-to-greet }}
