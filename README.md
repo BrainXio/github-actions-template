@@ -51,4 +51,4 @@ make test-push     # quick local test
 
 ## License
 
-Public domain (UNLICENSE)
+Not specified (public domain)
