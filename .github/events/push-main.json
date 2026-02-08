@@ -1,9 +1,0 @@
-{
-  "ref": "refs/heads/main",
-  "ref_name": "main",
-  "ref_type": "branch",
-  "repository": {
-    "default_branch": "main"
-  },
-  "act": true
-}
