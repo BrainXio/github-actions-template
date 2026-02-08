@@ -76,7 +76,7 @@ jobs:
     name: Release Dry Run
     needs: [validate, test-action]
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    if: github.event_name == 'pull_request' && (contains(github.event.pull_request.title, 'feat:') || contains(github.event.pull_request.title, 'fix:') || contains(github.event.pull_request.title, 'BREAKING CHANGE'))
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
