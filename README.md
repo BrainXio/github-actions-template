@@ -47,7 +47,16 @@ make test-push     # quick local test
 - `Makefile`                → commands (setup, lint, test-*, secrets)
 - `.pre-commit-config.yaml` → auto checks on commit
 - `action.yml`              → placeholder action
-- `.github/workflows/ci.yml` → basic test workflow
+- `.github/workflows/ci.yml` → main CI + release pipeline
+- `.github/workflows/issue-triage.yml` → optional issue automation
+
+## Workflows Documentation
+
+- **[CI + Release](docs/workflows/ci.md)**
+  Full pipeline: validation, action testing, semantic-release dry-run (with PR comments), and automated releases.
+
+- **[Issue Triage](docs/workflows/issue-triage.md)**
+  Optional automation for new issues: auto-label "investigate" + welcome comment.
 
 ## License
 
