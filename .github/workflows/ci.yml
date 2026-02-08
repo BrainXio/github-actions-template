@@ -1,5 +1,5 @@
-# .github/workflows/test-action.yml
-name: Test action
+# .github/workflows/ci.yml
+name: CI
 
 on:
   push:
@@ -17,7 +17,7 @@ permissions:
   statuses: write
 
 jobs:
-  hello:
+  test:
     runs-on: ubuntu-latest
     steps:
       - name: Hello Workflow
