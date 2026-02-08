@@ -76,7 +76,7 @@ jobs:
     name: Release Dry Run
     needs: [validate, test-action]
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' && (contains(github.event.pull_request.title, 'feat:') || contains(github.event.pull_request.title, 'fix:') || contains(github.event.pull_request.title, 'BREAKING CHANGE'))
+    if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -91,10 +91,32 @@ jobs:
       - name: Install semantic-release
         run: npm install semantic-release @semantic-release/github
 
-      - name: Dry-run semantic-release
-        run: npx semantic-release --dry-run
+      - name: Run semantic-release dry-run
+        id: dry-run
+        continue-on-error: true  # Continue even if dry-run fails
+        run: |
+          OUTPUT=$(npx semantic-release --dry-run 2>&1 || echo "FAILED")
+          if [[ $OUTPUT == "FAILED" ]]; then
+            echo "status=failed" >> $GITHUB_OUTPUT
+            echo "result=$OUTPUT" >> $GITHUB_OUTPUT
+          else
+            echo "status=passed" >> $GITHUB_OUTPUT
+            NEXT_VERSION=$(echo "$OUTPUT" | grep -oP '(?<=next release version: ).*' || echo "No release")
+            CHANGELOG_PREVIEW=$(echo "$OUTPUT" | grep -A 10 "Release notes" || echo "No preview")
+            RESULT="Next version: $NEXT_VERSION\n\nChangelog preview:\n$CHANGELOG_PREVIEW"
+            echo "result=$RESULT" >> $GITHUB_OUTPUT
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Post dry-run result to PR
+        if: github.event_name == 'pull_request'
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            ### Release Dry-Run Outcome
+            ${{ steps.dry-run.outputs.status == 'passed' && format('Passed! {0}', steps.dry-run.outputs.result) || format('Failed: {0}', steps.dry-run.outputs.result) }}
 
   release:
     name: Release
