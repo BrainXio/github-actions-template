@@ -57,11 +57,11 @@ git commit -m "feat: …"
 git push
 ```
 
-## What’s actually installed?
+## What's actually installed?
 
 - `act` (pinned version) – local GitHub Actions runner
 - `shellcheck` – bash linter
-- `pre-commit` + hooks (black, shellcheck, trailing whitespace, etc.)
+- `pre-commit` + hooks (black, shellcheck, trailing whitespace, markdownlint, etc.)
 - `detect-secrets` – secret scanning
 - `gh` CLI – GitHub from terminal
 - Utilities: jq, fzf, tree, curl, git
