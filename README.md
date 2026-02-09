@@ -75,7 +75,7 @@ Full documentation for working with this template:
 
 | Topic                     | Description                                      | Link |
 |---------------------------|--------------------------------------------------|------|
-| Overview & Table of Contents | Landing page + quick navigation                  | [Development Guide](./docs/development/index.md) |
+| Overview & Table of Contents | Landing page + quick navigation                  | [Development Guide](./docs/development/_index.md) |
 | Branching Strategy        | Naming, GitHub Flow, PR process                  | [Branching](./docs/development/branching.md) |
 | Conventional Commits      | Commit message format + version bumping rules    | [Commits](./docs/development/commits.md) |
 | Development Environment   | DevContainer, Makefile commands, daily workflow  | [Environment](./docs/development/environment.md) |
