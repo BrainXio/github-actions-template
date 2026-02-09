@@ -82,7 +82,7 @@ echo "→ Container-only steps"
 echo "  Installing apt packages ..."
 sudo apt-get update -qq && \
     sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        less git procps fzf zsh man-db unzip gnupg gh iptables ipset iproute2 dnsutils jq nano vim tree curl && \
+        less git procps fzf zsh man-db unzip gnupg gh iptables ipset iproute2 dnsutils jq nano vim tree curl zenity && \
     sudo apt-get clean && sudo rm -rf /var/lib/apt/lists/*
 
 # Firewall
