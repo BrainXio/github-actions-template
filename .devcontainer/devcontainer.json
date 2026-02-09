@@ -1,9 +1,6 @@
-// For format details, see https://aka.ms/devcontainer.json
 {
 	"name": "BrainXio GitHub Actions Template (Bash Hello-World)",
-
 	"image": "mcr.microsoft.com/devcontainers/base:ubuntu",
-
 	"features": {
 		"ghcr.io/devcontainers/features/docker-in-docker:2": {
 			"version": "latest",
@@ -21,28 +18,20 @@
 			"version": "latest"
 		}
 	},
-
-	// ────────────────────────────────────────────────
-	// Optional environment variables – uncomment locally only
-	// Never commit real secrets here!
-	// Use local .env + direnv/vscode settings or shell export instead.
-	// ────────────────────────────────────────────────
 	"containerEnv": {
-		// "GITHUB_TOKEN":     		"${localEnv:GITHUB_TOKEN}",
-		// "GH_TOKEN":         		"${localEnv:GH_TOKEN}",
-		// "ANTHROPIC_AUTH_TOKEN": 	"${localEnv:ANTHROPIC_AUTH_TOKEN:ollama}",
-		// "ANTHROPIC_BASE_URL":   	"${localEnv:ANTHROPIC_BASE_URL}",
-		// "ANTHROPIC_MODEL":      	"${localEnv:ANTHROPIC_MODEL}",
-		// "SEARXNG_URL":      		"${localEnv:SEARXNG_URL:false}",
+		"GITHUB_TOKEN": "${localEnv:GITHUB_TOKEN}",
+		"GH_TOKEN": "${localEnv:GH_TOKEN}",
+		"ANTHROPIC_AUTH_TOKEN": "${localEnv:ANTHROPIC_AUTH_TOKEN:ollama}",
+		"ANTHROPIC_BASE_URL": "${localEnv:ANTHROPIC_BASE_URL}",
+		"ANTHROPIC_MODEL": "${localEnv:ANTHROPIC_MODEL}",
+		"SEARXNG_URL": "${localEnv:SEARXNG_URL:false}",
 		"TZ": "${localEnv:TZ:Europe/Berlin}"
 	},
-
 	"remoteEnv": {
-		// "GITHUB_TOKEN":     "${localEnv:GITHUB_TOKEN}",
-		// "GH_TOKEN":         "${localEnv:GH_TOKEN}",
+		"GITHUB_TOKEN": "${localEnv:GITHUB_TOKEN}",
+		"GH_TOKEN": "${localEnv:GH_TOKEN}",
 		"EDITOR": "code --wait"
 	},
-
 	"customizations": {
 		"vscode": {
 			"extensions": [
@@ -60,14 +49,10 @@
 			}
 		}
 	},
-
 	"postCreateCommand": "make setup || echo 'Makefile setup failed — run manually'",
-
 	"postAttachCommand": "echo 'DevContainer ready.'",
-
 	"mounts": [
-		// Uncomment locally only – never commit real mounts with sensitive data
-		// "source=${localEnv:HOME}${localEnv:USERPROFILE}/.gitconfig,target=/home/vscode/.gitconfig,type=bind,consistency=cached"
-		// "source=${localEnv:HOME}${localEnv:USERPROFILE}/.gnupg,target=/home/vscode/.gnupg,type=bind,consistency=cached"
+		"source=${localEnv:HOME}${localEnv:USERPROFILE}/.gitconfig,target=/home/vscode/.gitconfig,type=bind,consistency=cached",
+		"source=${localEnv:HOME}${localEnv:USERPROFILE}/.gnupg,target=/home/vscode/.gnupg,type=bind,consistency=cached"
 	]
 }

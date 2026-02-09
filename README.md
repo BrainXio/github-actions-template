@@ -1,31 +1,14 @@
 # GitHub Actions Template
 
-<p align="center">
-  <a href="https://github.com/BrainXio">
-    <img src="https://github.com/BrainXio.png" alt="BrainXio Logo" width="80" height="80">
-  </a>
+![BrainXio Logo](https://github.com/BrainXio.png)
 
-  <p align="center" style="font-size: 1.1em; font-style: italic; margin: 1.5em auto;">
-    Curiosity. Freedom. Creation.
-  </p>
-</p>
+Curiosity. Freedom. Creation.
 
 ---
 
-<p align="center">
-  <a href="https://github.com/BrainXio"><strong>Explore the Factory →</strong></a>
-  ·
-  <a href="https://github.com/BrainXio/github-actions-template/issues/new?labels=bug&template=bug-report.md">Report Bug</a>
-  ·
-  <a href="https://github.com/BrainXio/github-actions-template/issues/new?labels=enhancement&template=feature-request.md">Request Feature</a>
-</p>
+[Explore the Factory →](https://github.com/BrainXio) · [Report Bug](https://github.com/BrainXio/github-actions-template/issues/new?labels=bug&template=bug-report.md) · [Request Feature](https://github.com/BrainXio/github-actions-template/issues/new?labels=enhancement&template=feature-request.md)
 
-<p align="center">
-  <img src="https://img.shields.io/github/license/BrainXio/github-actions-template?style=flat-square" alt="License">
-  <img src="https://img.shields.io/github/stars/BrainXio/github-actions-template?style=flat-square" alt="Stars">
-  <img src="https://img.shields.io/github/forks/BrainXio/github-actions-template?style=flat-square" alt="Forks">
-  <img src="https://github.com/BrainXio/github-actions-template/workflows/CI/badge.svg" alt="CI">
-</p>
+![License](https://img.shields.io/github/license/BrainXio/github-actions-template?style=flat-square) ![Stars](https://img.shields.io/github/stars/BrainXio/github-actions-template?style=flat-square) ![Forks](https://img.shields.io/github/forks/BrainXio/github-actions-template?style=flat-square) ![CI](https://github.com/BrainXio/github-actions-template/workflows/CI/badge.svg)
 
 ## What's included
 

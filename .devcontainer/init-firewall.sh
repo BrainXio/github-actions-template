@@ -113,12 +113,12 @@ fi
 
 # Allow essential outbound ports
 for rule in "${ALLOWED_PORTS_OUTPUT[@]}"; do
-    iptables -A OUTPUT -p ${rule% *} --dport ${rule#* } -j ACCEPT
+    iptables -A OUTPUT -p "${rule% *}" --dport "${rule#* }" -j ACCEPT
 done
 
 # Allow related inbound
 for rule in "${ALLOWED_PORTS_INPUT_RELATED[@]}"; do
-    iptables -A INPUT -p ${rule% *} --sport ${rule#* } \
+    iptables -A INPUT -p "${rule% *}" --sport "${rule#* }" \
         -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 done
 

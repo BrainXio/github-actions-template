@@ -105,7 +105,7 @@ jobs:
         id: dry-run
         continue-on-error: true
         run: |
-          DRY_OUTPUT=$(npx semantic-release --dry-run 2>&1)
+          DRY_OUTPUT="$(npx semantic-release --dry-run 2>&1)"
           EXIT_CODE=$?
 
           if [ $EXIT_CODE -eq 0 ]; then
@@ -118,8 +118,8 @@ jobs:
             RESULT="**Dry-run failed**\n\nError output:\n\`\`\`\n$DRY_OUTPUT\n\`\`\`"
           fi
 
-          echo "status=$STATUS" >> $GITHUB_OUTPUT
-          echo "result=$RESULT" >> $GITHUB_OUTPUT
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+          echo "result=$RESULT" >> "$GITHUB_OUTPUT"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

@@ -1,91 +1,129 @@
-# 02 – Branching Strategy
+# 03 – Conventional Commits
 
-Simple, modern, scalable **GitHub Flow** — one long-lived branch, short-lived feature branches, everything through pull requests.
+Lightweight, powerful convention for commit messages that enables **automatic versioning**, **changelogs**, and **readable history**.
 
-## Only long-lived branch: `main`
+## Why Conventional Commits?
 
-- Always reflects the latest **stable, released** version of your action
-- **Protected**: requires PR review + passing CI checks before merge
-- **Never** commit or push directly to `main` — all changes go through PRs
-- Every merge triggers CI validation + automatic release (via semantic-release)
+- Drives semantic-release → patch/minor/major bumps without manual tags
+- Generates clean, grouped changelogs automatically
+- Makes `git log` actually useful
+- Enforced by CI → prevents bad messages from merging
+- Becomes natural after 5–10 commits
 
-## Short-lived branches for every change
+## Basic format
 
-**Naming convention**
-`<type>/<short-kebab-case-description>`
+```
+<type>[optional scope]: <short description>
 
-**Allowed types** (lowercase, no spaces):
+[optional body – explain why, not what]
 
-- `feat/`   – new features or capabilities
-- `fix/`    – bug fixes
-- `docs/`   – documentation-only changes
-- `style/`  – formatting, whitespace, no behavior change
-- `refactor/` – code cleanup, no behavior change
-- `perf/`   – performance improvements
-- `test/`   – adding/improving tests
-- `chore/`  – maintenance, tooling, dependencies
-- `ci/`     – CI/CD pipeline changes
-- `build/`  – build system or external deps
-- `revert/` – reverting a previous commit
-
-**Good branch name examples** (realistic & varied)
-
-- `feat/add-log-level-input`
-- `feat/support-multiple-recipients`
-- `feat/add-json-output-format`
-- `fix/prevent-crash-on-missing-input`
-- `fix/escape-special-characters-in-name`
-- `docs/clarify-required-vs-optional-inputs`
-- `docs/add-action-usage-examples-to-readme`
-- `style/remove-trailing-whitespace-in-entrypoint`
-- `refactor/extract-logging-to-separate-function`
-- `perf/avoid-repeated-date-calls-in-loop`
-- `test/add-cases-for-empty-and-null-inputs`
-- `test/verify-output-format-on-different-events`
-- `chore/upgrade-shellcheck-to-0.10.0`
-- `chore/pin-act-to-v0.2.84`
-- `ci/add-testing-on-windows-2022-runner`
-- `ci/split-unit-and-integration-tests`
-- `build/update-node-to-20-in-action.yml`
-- `revert/feat/add-log-level-input` (after bad merge)
-
-**Bad branch names (avoid these patterns)**
-
-- `feature/add-input`
-- `bugfix/empty-input`
-- `my-cool-change`
-- `fix-this-thing`
-- `update-readme-again`
-- `temp-branch-for-testing`
-
-## Typical workflow (copy-paste friendly)
-
-```bash
-# Start fresh from main
-git checkout main
-git pull origin main
-
-# Create your branch
-git checkout -b feat/add-timezone-support
-
-# Work, test, commit
-# … make changes …
-make lint
-make test-push
-git commit -m "feat: add timezone input to greeting"
-
-# Push & create PR
-git push -u origin feat/add-timezone-support
+[optional footer(s)]
 ```
 
-Then on GitHub:
-- Open PR
-- Use conventional commit title (e.g. `feat: add timezone input`)
-- Explain what, why, how to test in PR body
-- Wait for CI (lint, tests, dry-run preview)
-- Get review → **squash merge** (keeps history clean)
-- Delete branch after merge
+- **type** (required) – lowercase, from allowed list
+- **scope** (optional) – e.g. `action`, `entrypoint`, `ci`, `readme`
+- **short description** – imperative mood, lowercase, **no period at end**
+- **body** – wrapped at ~72 chars, explains motivation/context
+- **footer** – e.g. `BREAKING CHANGE:`, `Closes #42`, `Fixes #17`
 
-**Pro tip**: Enable “Automatically delete head branches” in repo settings.
+## Allowed types
 
-Next → [03 – Conventional Commits](03-commits.md)
+Type       | Meaning                              | Version bump | Changelog?
+-----------|--------------------------------------|--------------|-----------
+`feat`     | New feature or capability            | minor        | Yes
+`fix`      | Bug fix                              | patch        | Yes
+`docs`     | Documentation only                   | none         | No
+`style`    | Formatting/whitespace (no logic)     | none         | No
+`refactor` | Code restructure (no behavior change)| none         | No
+`perf`     | Performance improvement              | patch        | Yes
+`test`     | Adding/correcting tests              | none         | No
+`chore`    | Maintenance, tooling, deps           | none         | No
+`ci`       | CI/CD config changes                 | none         | No
+`build`    | Build system / external deps         | none         | No
+`revert`   | Revert previous commit               | none         | No
+
+**Breaking change**: Add `!` after type (`feat!:`) **or** footer `BREAKING CHANGE:` → major bump
+
+## Good commit message examples
+
+**New feature**
+```
+feat: add timezone input to greeting
+
+Allows custom timezone for output timestamp.
+Uses UTC by default if unset.
+
+Closes #12
+```
+
+**Bug fix with scope**
+```
+fix(entrypoint): handle empty who-to-greet gracefully
+
+Prevents crash when input is empty string or whitespace.
+```
+
+**Docs only**
+```
+docs: improve quick-start section in README
+```
+
+**CI change**
+```
+ci: add matrix testing for ubuntu-latest and windows-2022
+```
+
+**Breaking change**
+```
+feat!: change default greeting to uppercase
+
+BREAKING CHANGE: Greeting is now uppercase by default.
+Update consumers accordingly.
+```
+
+**Revert**
+```
+revert: feat: add timezone input
+
+This reverts commit 7f3b2a1 due to timezone edge cases.
+```
+
+## Bad commit messages (will fail CI validation)
+
+```
+added timezone
+bugfix empty input
+update readme
+refactored some code
+fix stuff
+```
+
+## Quick cheat sheet
+
+Change type          | Commit prefix   | Version bump | Appears in changelog?
+---------------------|-----------------|--------------|----------------------
+New feature          | `feat:`         | minor        | Yes
+Bug fix              | `fix:`          | patch        | Yes
+Breaking change      | `feat!:` or footer | major     | Yes
+Docs / formatting    | `docs:`, `style:` | none      | No
+Refactor / tests     | `refactor:`, `test:` | none   | No
+Maintenance / CI     | `chore:`, `ci:` | none         | No
+
+## Tips for writing great messages
+
+1. Always start with type (`feat:`, `fix:`, etc.)
+2. Keep subject line ≤ 50–60 chars
+3. Use lowercase for description, imperative mood (“add”, “fix”, not “added”, “fixed”)
+4. No period at end of subject
+5. Explain **why** in body (code already shows **what**)
+6. Reference issues: `Closes #123`, `Fixes #456`
+
+Try it now:
+
+```bash
+git commit --allow-empty -m "feat: test conventional commit format"
+```
+
+Push → open PR → watch CI validate it instantly.
+
+Next → [04 – Testing Locally](04-testing.md)

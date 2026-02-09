@@ -63,8 +63,20 @@ else
     echo "  pre-commit already installed via pipx"
 fi
 
-# pre-commit hooks
-pre-commit install --install-hooks || echo "pre-commit install failed (non-fatal)"
+# ─── Fix for outdated system nodeenv breaking pre-commit Node hooks ─────────────
+echo "  Fixing nodeenv for pre-commit (actionlint/markdownlint) ..."
+python3 -m pip install --upgrade pip --user || true
+python3 -m pip install --user --upgrade nodeenv --break-system-packages || {
+    echo "  nodeenv upgrade failed – continuing anyway (may skip Node hooks)"
+}
+# Clean pre-commit cache to force fresh environment creation
+rm -rf ~/.cache/pre-commit 2>/dev/null || true
+# ────────────────────────────────────────────────────────────────────────────────
+
+# pre-commit hooks (now with fixed nodeenv)
+pre-commit install --install-hooks || {
+    echo "pre-commit install failed (non-fatal – try 'pre-commit install --install-hooks' manually later)"
+}
 
 # ────────────────────────────────────────────────────────────────────────────────
 # Container-only setup
@@ -82,7 +94,7 @@ echo "→ Container-only steps"
 echo "  Installing apt packages ..."
 sudo apt-get update -qq && \
     sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        less git procps fzf zsh man-db unzip gnupg gh iptables ipset iproute2 dnsutils jq nano vim tree curl && \
+        less git procps fzf zsh man-db unzip gnupg gh iptables ipset iproute2 dnsutils jq nano vim tree curl zenity && \
     sudo apt-get clean && sudo rm -rf /var/lib/apt/lists/*
 
 # Firewall

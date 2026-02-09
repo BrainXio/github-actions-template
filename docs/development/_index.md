@@ -46,15 +46,14 @@ Open a PR → squash-merge → watch automatic release happen.
 
 ## Development Lifecycle at a Glance
 
-Phase                     | Document                                      | Key Commands / Focus
---------------------------|-----------------------------------------------|---------------------------------------
-1. Environment & Tools    | [01-setup.md](01-setup.md)                    | `make setup`, `make help`
-2. Branching rules        | [02-branching.md](02-branching.md)            | `feat/…`, `fix/…` branches
-3. Commit & PR conventions| [03-commits.md](03-commits.md)                | `feat:`, `fix:`, `BREAKING CHANGE:`
-4. Local testing          | [04-testing.md](04-testing.md)                | `make test-push`, `make tests`
-5. Adding features        | [05-adding-features.md](05-adding-features.md)| New inputs, outputs, logic
-6. Releasing              | [06-releasing.md](06-releasing.md)            | Automatic after merge
-7. Recipes & examples     | [07-common-scenarios.md](07-common-scenarios.md)| Real-world how-tos
-8. Troubleshooting        | [08-troubleshooting.md](08-troubleshooting.md)| When things go wrong
+- [01-setup.md](01-setup.md) – **Environment & Tools** (`make setup`, `make help`)
+- [02-branching.md](02-branching.md) – **Branching rules** (`feat/…`, `fix/…` branches)
+- [03-conventional-commits.md](03-conventional-commits.md) – **Commit & PR conventions** (`feat:`, `fix:`, `BREAKING CHANGE:`)
+- [04-testing.md](04-testing.md) – **Local testing** (`make test-push`, `make tests`)
+- [05-adding-features.md](05-adding-features.md) – **Adding features** (New inputs, outputs, logic)
+- [06-releasing.md](06-releasing.md) – **Releasing** (Automatic after merge)
+- [07-common-scenarios.md](07-common-scenarios.md) – **Recipes & examples** (Real-world how-tos)
+- [08-troubleshooting.md](08-troubleshooting.md) – **Troubleshooting** (When things go wrong)
+- [10-claude.md](10-claude.md) – **Working with Claude** (Claude Code integration)
 
 Start here → [01 – Development Environment Setup](01-setup.md)
