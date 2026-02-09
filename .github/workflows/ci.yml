@@ -94,12 +94,13 @@ jobs:
       - name: Install semantic-release and plugins
         run: |
           npm install \
-          semantic-release \
-          @semantic-release/commit-analyzer \
-          @semantic-release/release-notes-generator \
-          @semantic-release/changelog \
-          @semantic-release/github \
-          @semantic-release/git
+            semantic-release \
+            @semantic-release/commit-analyzer \
+            @semantic-release/release-notes-generator \
+            @semantic-release/changelog \
+            @semantic-release/github \
+            @semantic-release/git \
+            conventional-changelog-conventionalcommits
 
       - name: Run semantic-release dry-run
         id: dry-run
@@ -153,12 +154,13 @@ jobs:
       - name: Install semantic-release and plugins
         run: |
           npm install \
-          semantic-release \
-          @semantic-release/commit-analyzer \
-          @semantic-release/release-notes-generator \
-          @semantic-release/changelog \
-          @semantic-release/github \
-          @semantic-release/git
+            semantic-release \
+            @semantic-release/commit-analyzer \
+            @semantic-release/release-notes-generator \
+            @semantic-release/changelog \
+            @semantic-release/github \
+            @semantic-release/git \
+            conventional-changelog-conventionalcommits
 
       - name: Run semantic-release
         run: npx semantic-release
