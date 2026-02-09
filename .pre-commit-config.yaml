@@ -1,45 +1,56 @@
 # .pre-commit-config.yaml
-# Starter config for a bash-focused GitHub Actions template repo
-# Run `pre-commit autoupdate` periodically to keep revs current
+# Recommended starter config for a bash-focused repo with GitHub Actions
+# Tip: Run `pre-commit autoupdate` regularly to keep revisions current
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v6.0.0  # latest stable as of early 2026; run autoupdate to bump
+    rev: v6.0.0  # latest as of mid-2025 → autoupdate may bump to v6.x or v7.x
     hooks:
-      - id: check-yaml                  # good for action.yml + workflows
-        args: [--allow-multiple-documents]  # many GitHub files have multi-doc YAML
+      - id: check-yaml
+        args: [--allow-multiple-documents]  # needed for many GitHub workflow files
       - id: end-of-file-fixer
       - id: trailing-whitespace
       - id: check-added-large-files
         args: ['--maxkb=500']
       - id: check-merge-conflict
+      - id: mixed-line-ending  # often forgotten — enforces LF on non-Windows
+        args: [--fix=lf]
 
-  # Add this instead (or keep both and exclude devcontainer.json)
   - repo: local
     hooks:
-      - id: check-devcontainer-json
-        name: Validate devcontainer.json (skip strict JSON check)
-        entry: bash -c 'echo "Skipping strict JSON validation for JSONC file"; exit 0'
+      - id: validate-devcontainer-json
+        name: Validate devcontainer.json (JSONC tolerant)
+        entry: bash -c 'command -v jq >/dev/null || { echo "jq not found"; exit 1; }; jq . "$1" >/dev/null || { echo "Invalid JSON in $1"; exit 1; }' --
         language: system
         files: ^\.devcontainer/devcontainer\.json$
-        pass_filenames: false
+        # Note: jq ignores // comments → good enough for most devcontainer.json files
+        # If you need stricter validation, consider a dedicated JSONC parser
 
   - repo: https://github.com/koalaman/shellcheck-precommit
-    rev: v0.11.0  # or latest tag — check repo for updates
+    rev: v0.11.0  # still current in 2026; check repo if newer tags appear
     hooks:
       - id: shellcheck
-        args: [--severity=warning]      # adjust to error if you want stricter
-        files: ^(scripts/|\.devcontainer/.*\.sh)$  # limit to your bash files
+        args: [--severity=warning, --format=gcc]  # gcc format = better pre-commit output
+        files: ^(scripts/|\.github/actions/.*\.sh|\.devcontainer/.*\.sh)$
 
   - repo: https://github.com/Yelp/detect-secrets
-    rev: v1.5.0  # latest per current data (2024–2025 tags; autoupdate will handle future bumps)
+    rev: v1.5.0  # latest release (May 2024); no major updates since
     hooks:
       - id: detect-secrets
-        args: ['--baseline', '.secrets.baseline']  # create this file once with `detect-secrets scan > .secrets.baseline`
-        exclude: ^\.devcontainer/domains\.log$|^.*\.log$|^tmp/  # ignore logs/temp
+        args: ['--baseline', '.secrets.baseline']
+        # Create baseline once: detect-secrets scan --update .secrets.baseline
+        exclude: ^\.devcontainer/.*log$|^.*\.log$|^tmp/|^\\.git/
 
-# Optional extras you can uncomment later:
-# - repo: https://github.com/rhysd/actionlint
-#   rev: v1.7.4  # lint GitHub Actions workflow syntax
-#   hooks:
-#     - id: actionlint
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.10  # latest as of late 2025
+    hooks:
+      - id: actionlint
+        # Optional: add -shellcheck= if you want to disable shellcheck integration
+        # files: ^\.github/workflows/.*\.ya?ml$   # uncomment if you want to limit scope
+
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.47.0  # latest as of Dec 2025
+    hooks:
+      - id: markdownlint
+        args: ['--config', '.markdownlint.json']
+        # files: \\.md$   # usually not needed — defaults to *.md, *.markdown

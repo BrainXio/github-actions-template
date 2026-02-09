@@ -63,8 +63,20 @@ else
     echo "  pre-commit already installed via pipx"
 fi
 
-# pre-commit hooks
-pre-commit install --install-hooks || echo "pre-commit install failed (non-fatal)"
+# ─── Fix for outdated system nodeenv breaking pre-commit Node hooks ─────────────
+echo "  Fixing nodeenv for pre-commit (actionlint/markdownlint) ..."
+python3 -m pip install --upgrade pip --user || true
+python3 -m pip install --user --upgrade nodeenv --break-system-packages || {
+    echo "  nodeenv upgrade failed – continuing anyway (may skip Node hooks)"
+}
+# Clean pre-commit cache to force fresh environment creation
+rm -rf ~/.cache/pre-commit 2>/dev/null || true
+# ────────────────────────────────────────────────────────────────────────────────
+
+# pre-commit hooks (now with fixed nodeenv)
+pre-commit install --install-hooks || {
+    echo "pre-commit install failed (non-fatal – try 'pre-commit install --install-hooks' manually later)"
+}
 
 # ────────────────────────────────────────────────────────────────────────────────
 # Container-only setup
