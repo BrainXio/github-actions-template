@@ -1,56 +1,69 @@
 # .pre-commit-config.yaml
-# Recommended starter config for a bash-focused repo with GitHub Actions
-# Tip: Run `pre-commit autoupdate` regularly to keep revisions current
+# Multi-language starter for GitHub Actions template (bash, node, python)
+# Run `pre-commit autoupdate` periodically to bump revs
 
 repos:
+  # General / cross-language hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v6.0.0  # latest as of mid-2025 → autoupdate may bump to v6.x or v7.x
+    rev: v6.0.0  # Latest as of mid-2025; autoupdate may bump to v6.x/v7.x
     hooks:
       - id: check-yaml
-        args: [--allow-multiple-documents]  # needed for many GitHub workflow files
+        args: [--allow-multiple-documents]  # Handles multi-doc workflows
       - id: end-of-file-fixer
       - id: trailing-whitespace
       - id: check-added-large-files
         args: ['--maxkb=500']
       - id: check-merge-conflict
-      - id: mixed-line-ending  # often forgotten — enforces LF on non-Windows
+      - id: mixed-line-ending
         args: [--fix=lf]
 
-  - repo: local
-    hooks:
-      - id: validate-devcontainer-json
-        name: Validate devcontainer.json (JSONC tolerant)
-        entry: bash -c 'command -v jq >/dev/null || { echo "jq not found"; exit 1; }; jq . "$1" >/dev/null || { echo "Invalid JSON in $1"; exit 1; }' --
-        language: system
-        files: ^\.devcontainer/devcontainer\.json$
-        # Note: jq ignores // comments → good enough for most devcontainer.json files
-        # If you need stricter validation, consider a dedicated JSONC parser
-
+  # ShellCheck for bash scripts
   - repo: https://github.com/koalaman/shellcheck-precommit
-    rev: v0.11.0  # still current in 2026; check repo if newer tags appear
+    rev: v0.11.0  # Current stable as of early 2026
     hooks:
       - id: shellcheck
-        args: [--severity=warning, --format=gcc]  # gcc format = better pre-commit output
-        files: ^(scripts/|\.github/actions/.*\.sh|\.devcontainer/.*\.sh)$
+        args: [--severity=warning, --format=gcc]
+        files: ^(src/(composite|bash)/.*\.sh|\.devcontainer/.*\.sh|scripts/.*\.sh)$
 
+  # Ruff for Python (lint + auto-format)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.0  # Latest as of Feb 2026 (check repo for newer)
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]  # Auto-fix where possible
+        files: ^src/python/.*\.py$
+      - id: ruff-format
+        files: ^src/python/.*\.py$
+
+  # ESLint for JavaScript/TypeScript
+  - repo: https://github.com/pre-commit/mirrors-eslint
+    rev: v9.13.0
+    hooks:
+      - id: eslint
+        files: ^src/node/.*\.(js|jsx|ts|tsx)$
+        types: [file]
+        # Remove this block - no deps needed for bare config
+        # additional_dependencies:
+        #   - eslint@9.13.0
+
+  # actionlint for GitHub Workflows
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.10  # Latest as of late 2025/early 2026
+    hooks:
+      - id: actionlint
+        files: ^\.github/workflows/.*\.ya?ml$
+
+  # Markdown linting (for docs/README)
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.47.0  # Current as of Dec 2025
+    hooks:
+      - id: markdownlint
+        args: ['--config', '.markdownlint.json']  # Add .markdownlint.json if needed
+
+  # Secret scanning (optional but good practice)
   - repo: https://github.com/Yelp/detect-secrets
-    rev: v1.5.0  # latest release (May 2024); no major updates since
+    rev: v1.5.0
     hooks:
       - id: detect-secrets
         args: ['--baseline', '.secrets.baseline']
-        # Create baseline once: detect-secrets scan --update .secrets.baseline
         exclude: ^\.devcontainer/.*log$|^.*\.log$|^tmp/|^\\.git/
-
-  - repo: https://github.com/rhysd/actionlint
-    rev: v1.7.10  # latest as of late 2025
-    hooks:
-      - id: actionlint
-        # Optional: add -shellcheck= if you want to disable shellcheck integration
-        # files: ^\.github/workflows/.*\.ya?ml$   # uncomment if you want to limit scope
-
-  - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.47.0  # latest as of Dec 2025
-    hooks:
-      - id: markdownlint
-        args: ['--config', '.markdownlint.json']
-        # files: \\.md$   # usually not needed — defaults to *.md, *.markdown

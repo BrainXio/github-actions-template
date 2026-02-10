@@ -21,14 +21,56 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6.0.2
 
+      # ────────────── Bash ──────────────
       - name: Lint bash scripts
-        run: shellcheck --shell=bash src/*.sh .devcontainer/*.sh
+        run: |
+          set -euo pipefail
+          files=(src/composite/*.sh src/*.sh .devcontainer/*.sh)
+          shopt -s nullglob
+          if ((${#files[@]} > 0)); then
+            shellcheck --shell=bash "${files[@]}"
+          else
+            echo "No bash scripts found to lint"
+          fi
 
-      - name: Set up Python (for pre-commit or Python-based actions)
+      # ────────────── Setup shared environments ──────────────
+      - name: Set up Python
         uses: actions/setup-python@v6.2.0
         with:
-          python-version: '3.11'
+          python-version: '3.14'
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v6.2.0
+        with:
+          node-version: '24'
+
+      # ────────────── Python linting (Ruff) ──────────────
+      - name: Lint Python files (Ruff)
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          pip install ruff
+          files=(src/python/*.py)
+          if ((${#files[@]} > 0)); then
+            ruff check --output-format=text "${files[@]}"
+            ruff format --check "${files[@]}"
+          else
+            echo "No Python files found to lint"
+          fi
+
+      # ────────────── JavaScript linting (ESLint) ──────────────
+      - name: Lint JavaScript files (ESLint)
+        run: |
+          set -euo pipefail
+          npm install --no-save eslint@9 @eslint/js globals
+          files=(src/node/*.js src/node/*.ts)
+          if ((${#files[@]} > 0)); then
+            npx eslint --format stylish "${files[@]}"
+          else
+            echo "No JavaScript/TypeScript files found to lint"
+          fi
+
+      # ────────────── pre-commit (can include black, eslint, etc. via hooks) ──────────────
       - name: Install pre-commit
         run: pip install pre-commit
 
