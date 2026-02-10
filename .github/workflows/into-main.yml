@@ -110,7 +110,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: 'npm'
 
       - name: Install release tools
         run: |
@@ -128,24 +127,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Capture full dry-run output (redirect stderr too)
           DRY_OUTPUT=$(npx semantic-release --dry-run 2>&1) || true
+          echo "$DRY_OUTPUT"  # for visibility in logs
 
-          # Extract version (robust regex for semver + prereleases)
-          if echo "$DRY_OUTPUT" | grep -qE "no releas|won't be published|No release"; then
-            NEXT_VERSION="no-release-pending"
-          elif echo "$DRY_OUTPUT" | grep -qE "error|failed|ERR|E[A-Z]+"; then
-            NEXT_VERSION="failed"
-            echo "Dry-run failed — see logs below"
-            echo "$DRY_OUTPUT" | tail -n 15
-          else
-            NEXT_VERSION=$(echo "$DRY_OUTPUT" | grep -oP 'The next release version is \K\S+' || echo "unknown")
-          fi
+          NEXT_VERSION=$(echo "$DRY_OUTPUT" | grep -oP 'The next release version is \K\S+' || echo "no-release-pending")
 
           echo "Next version preview: $NEXT_VERSION"
           echo "next_version=$NEXT_VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Generate preview report
+      - name: Generate report
         if: always()
         env:
           JOB_STATUS: ${{ job.status }}
@@ -179,8 +169,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      issues: write
-      pull-requests: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -191,7 +179,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: 'npm'
 
       - name: Install release tools
         run: |
