@@ -36,7 +36,7 @@ See the individual job logs in the Actions UI for more details (dry-run output, 
 This comment is automatically updated by the **Report Status** job.
 "
 
-# Print to console (always visible in logs)
+# Print to console (always)
 echo -e "$SUMMARY"
 
 # Only post/update comment on pull_request
@@ -52,9 +52,18 @@ if [[ "$EVENT_NAME" == "pull_request" && -n "$PR_NUMBER" ]]; then
     -H "Authorization: Bearer ${GITHUB_TOKEN}" \
     "${API_BASE}/repos/${REPO_FULL}/issues/${PR_NUMBER}/comments")
 
-  EXISTING_ID=$(echo "$COMMENTS" | jq -r '
-    .[] | select(.body | contains("<!-- workflow-reporter-marker -->")) | .id
-    ' | head -n1)
+  # Check if response is a JSON array
+  if echo "$COMMENTS" | jq -e 'type == "array"' >/dev/null 2>&1; then
+    EXISTING_ID=$(echo "$COMMENTS" | jq -r '
+      .[]
+      | select(.body? | contains("<!-- workflow-reporter-marker -->"))
+      | .id
+      ' | head -n 1)
+  else
+    echo "Warning: GitHub API did not return a comment list"
+    echo "Response starts with: $(echo "$COMMENTS" | head -n 3)"
+    EXISTING_ID=""
+  fi
 
   if [[ -n "${EXISTING_ID}" && "${EXISTING_ID}" != "null" ]]; then
     echo "Updating comment #${EXISTING_ID}"
@@ -62,16 +71,14 @@ if [[ "$EVENT_NAME" == "pull_request" && -n "$PR_NUMBER" ]]; then
       -H "Accept: application/vnd.github+json" \
       -H "Authorization: Bearer ${GITHUB_TOKEN}" \
       -d "{\"body\": ${COMMENT_BODY_JSON}}" \
-      "${API_BASE}/repos/${REPO_FULL}/issues/comments/${EXISTING_ID}" \
-      > /dev/null || echo "PATCH failed"
+      "${API_BASE}/repos/${REPO_FULL}/issues/comments/${EXISTING_ID}"
   else
     echo "Creating new comment"
     curl -sSL -X POST \
       -H "Accept: application/vnd.github+json" \
       -H "Authorization: Bearer ${GITHUB_TOKEN}" \
       -d "{\"body\": ${COMMENT_BODY_JSON}}" \
-      "${API_BASE}/repos/${REPO_FULL}/issues/${PR_NUMBER}/comments" \
-      > /dev/null || echo "POST failed"
+      "${API_BASE}/repos/${REPO_FULL}/issues/${PR_NUMBER}/comments"
   fi
 else
   echo "Not a pull_request event → summary logged only"
