@@ -55,8 +55,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  test-action:
-    name: Test Action
+  testing:
+    name: Testing
     needs: validate
     if: github.event_name != 'issues'  # Skip on issues events
     runs-on: ubuntu-latest
@@ -65,7 +65,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Test the action
-        id: test-action
+        id: testing
         uses: ./
         with:
           who-to-greet: '${{ github.event_name }} Runner'
@@ -73,11 +73,11 @@ jobs:
       - name: Verify action outputs
         run: |
           echo "Event: ${{ github.event_name }}"
-          echo "Greeting time: ${{ steps.test-action.outputs.time }}"
+          echo "Greeting time: ${{ steps.testing.outputs.time }}"
 
   release:
-    name: Release (Dry-Run + Live)
-    needs: [validate, test-action]
+    name: Releasing
+    needs: [validate, testing]
     runs-on: ubuntu-latest
     permissions:
       contents: write          # Needed for real release (tag + release creation)
