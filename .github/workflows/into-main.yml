@@ -76,7 +76,7 @@ jobs:
           pip install ruff
           files="${{ needs.check.outputs.python_files }}"
           if [[ -n "$files" ]]; then
-            ruff check --output-format=text $files
+            ruff check --output-format=github $files     # github format is CI-friendly
             ruff format --check $files
           else
             echo "No Python files found to lint"
