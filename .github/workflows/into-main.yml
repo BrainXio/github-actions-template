@@ -135,9 +135,10 @@ jobs:
         id: dry-run
         continue-on-error: true
         run: |
-          # Simulate main branch context for version prediction
-          export BRANCH_NAME=main
-          npx semantic-release --dry-run --no-ci > dry-run.log 2>&1 || true
+          npx semantic-release --dry-run --noop > dry-run.log 2>&1
+          # Try to extract from log as fallback
+          NEXT_VERSION=$(grep -E 'The next release version is|next release version is' dry-run.log | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?' | tail -1 || echo "unknown")
+          echo "next_version=$NEXT_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Generate report
         id: report
