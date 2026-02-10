@@ -94,19 +94,18 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    outputs:
-      next_version: ${{ steps.report.outputs.next_version }}
     if: >
       github.event_name == 'push' ||
       github.event_name == 'pull_request' ||
       github.event_name == 'workflow_dispatch' ||
       github.event_name == 'schedule'
+    outputs:
+      next_version: ${{ steps.report.outputs.next_version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
-          fetch-tags: true
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -131,20 +130,7 @@ jobs:
             @semantic-release/git \
             conventional-changelog-conventionalcommits
 
-      - name: Dry-run
-        id: dry-run
-        continue-on-error: true
-        run: |
-          git fetch --tags --force --prune
-
-          # Force semantic-release to allow this branch for dry-run
-          npx semantic-release --dry-run --branches "$GITHUB_REF_NAME" > dry-run.log 2>&1 || true
-
-          # Extract version
-          NEXT_VERSION=$(grep -Ei 'next release version is' dry-run.log | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?' | tail -1 || echo "unknown")
-          echo "next_version=$NEXT_VERSION" >> "$GITHUB_OUTPUT"
-
-      - name: Generate report
+      - name: Generate preview & report
         id: report
         if: always()
         env:
