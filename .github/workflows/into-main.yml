@@ -168,16 +168,12 @@ jobs:
           echo "Language variant: ${{ matrix.lang }}"
           echo "Event: ${{ github.event_name }}"
 
-          # Read time dynamically
-          TIME_OUTPUT=$(grep '^time=' "$GITHUB_OUTPUT" | cut -d= -f2- || echo "")
+          TIME="${{ steps.action.outputs.time }}"
 
-          echo "Greeting time: $TIME_OUTPUT"
+          echo "Greeting time: $TIME"
 
-          if [ -z "$TIME_OUTPUT" ]; then
-            echo "Missing time output!" >&2
-            echo "DEBUG: Full GITHUB_OUTPUT contents:" >&2
-            cat "$GITHUB_OUTPUT" >&2 || echo "GITHUB_OUTPUT file not readable" >&2
-            echo "DEBUG: GITHUB_OUTPUT path: $GITHUB_OUTPUT" >&2
+          if [ -z "$TIME" ]; then
+            echo "Missing time output from action!" >&2
             exit 1
           fi
 
