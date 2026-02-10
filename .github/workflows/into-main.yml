@@ -207,7 +207,7 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     permissions:
-      pull-requests: write
+      pull-requests: write   # still needed, but only used conditionally
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -220,4 +220,12 @@ jobs:
           RUN_ID: ${{ github.run_id }}
           REPO: ${{ github.repository }}
           SERVER_URL: ${{ github.server_url }}
+          NEEDS_VALIDATE_RESULT:       ${{ needs.validate.result }}
+          NEEDS_TEST_RESULT:           ${{ needs.test.result }}
+          NEEDS_RELEASE_PREVIEW_RESULT: ${{ needs.release-preview.result }}   # underscore instead of hyphen
+          NEEDS_RELEASE_GUARD_RESULT:  ${{ needs.release-guard.result }}
+          NEEDS_RELEASE_RESULT:        ${{ needs.release.result }}
         run: .github/scripts/workflow-reporter.sh
+
+      # Optional: if you want to fail the reporter job only on real errors (not skipped comment)
+      # But usually better to let it succeed always
