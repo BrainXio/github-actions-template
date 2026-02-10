@@ -2,63 +2,74 @@
 set -euo pipefail
 
 # ────────────────────────────────────────────────
-# 1. Determine branch name safely (PR or push)
+# Determine branch name (PR head ref preferred)
 # ────────────────────────────────────────────────
-CURRENT_BRANCH="${GITHUB_HEAD_REF:-$(git rev-parse --abbrev-ref HEAD)}"
-if [[ -z "$CURRENT_BRANCH" || "$CURRENT_BRANCH" = "HEAD" ]]; then
-  CURRENT_BRANCH="preview-$(date +%s)"
+PR_BRANCH="${GITHUB_HEAD_REF:-$(git rev-parse --abbrev-ref HEAD)}"
+if [[ -z "$PR_BRANCH" || "$PR_BRANCH" == "HEAD" ]]; then
+  PR_BRANCH="pr-preview-$(date +%s)-${GITHUB_RUN_ID:-local}"
 fi
 
+# Temp branch name we will push (must match what we allow in config)
+TEMP_BRANCH="preview-dryrun-${GITHUB_RUN_ID:-local}-${GITHUB_SHA:0:8}"
+
+CURRENT_VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "no tags")
+
 # ────────────────────────────────────────────────
-# 2. Fetch tags (needed for last version detection)
+# Fetch tags
 # ────────────────────────────────────────────────
 git fetch --tags --force --prune || true
 
 # ────────────────────────────────────────────────
-# 3. Create temporary local-only config that allows current branch
-#    → overrides .releaserc.json branches only for this dry-run
+# Create & force-push a temporary branch pointing at current HEAD
+# (uses GITHUB_TOKEN which has contents:write permission in this job)
+# ────────────────────────────────────────────────
+git checkout -b "${TEMP_BRANCH}"
+git push --force origin "${TEMP_BRANCH}"
+
+# ────────────────────────────────────────────────
+# Temporary config that explicitly allows our temp branch
 # ────────────────────────────────────────────────
 cat > .releaserc.preview.json <<EOF
 {
   "extends": "./.releaserc.json",
-  "branches": ["${CURRENT_BRANCH}", "main"],
+  "branches": ["main", "${TEMP_BRANCH}"],
   "ci": false,
   "dryRun": true
 }
 EOF
 
 # ────────────────────────────────────────────────
-# 4. Run dry-run with local config override
+# Trick semantic-release into using the pushed branch name
+# by overriding GITHUB_REF temporarily
 # ────────────────────────────────────────────────
-unset GITHUB_ACTIONS   # just in case — helps bypass some CI skips
-npx semantic-release --config .releaserc.preview.json --no-ci > dry-run.log 2>&1
+unset GITHUB_ACTIONS
+DRY_RUN_BRANCH="${TEMP_BRANCH}" GITHUB_REF="refs/heads/${TEMP_BRANCH}" \
+  npx semantic-release --config .releaserc.preview.json --no-ci > dry-run.log 2>&1
 DRY_RUN_EXIT=$?
 
 # ────────────────────────────────────────────────
-# 5. Cleanup temp file
+# Cleanup: delete temp branch remotely & locally, remove temp config
 # ────────────────────────────────────────────────
+git push origin --delete "${TEMP_BRANCH}" || true
+git checkout -q "${PR_BRANCH}" || git checkout -q main || true
 rm -f .releaserc.preview.json
 
 # ────────────────────────────────────────────────
-# 6. Parse outputs
+# Parse next version
 # ────────────────────────────────────────────────
-CURRENT_VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "no tags")
-
 NEXT_VERSION=$(grep -Eai 'next release version is' dry-run.log | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.+]+)?' | tail -1 || true)
 
 if [[ -z "$NEXT_VERSION" ]]; then
   if [[ $DRY_RUN_EXIT -ne 0 ]]; then
     NEXT_VERSION="error (exit=$DRY_RUN_EXIT)"
-  elif grep -qiE 'no .*changes|no new release|no relevant|nothing to release' dry-run.log 2>/dev/null; then
+  elif grep -qiE 'no .*changes|no new release|nothing to release' dry-run.log 2>/dev/null; then
     NEXT_VERSION="${CURRENT_VERSION} (no bump)"
   else
     NEXT_VERSION="unknown / skipped"
   fi
 fi
 
-# ────────────────────────────────────────────────
-# 7. Validation status
-# ────────────────────────────────────────────────
+# Validation status
 if [[ $DRY_RUN_EXIT -eq 0 ]]; then
   VALIDATION="✅ Dry-run passed"
 else
@@ -66,7 +77,7 @@ else
 fi
 
 # ────────────────────────────────────────────────
-# 8. Write to step summary (visible in job log & PR checks)
+# Write summary
 # ────────────────────────────────────────────────
 {
   echo "### Release Preview"
@@ -84,10 +95,7 @@ fi
     echo "→ No dry-run.log generated"
   fi
   echo ""
-  echo "> Note: Preview calculated from current branch/PR commits only (using temporary config override)."
+  echo "> Note: Preview uses temporary pushed branch + config override to force calculation from PR commits only."
 } >> "$GITHUB_STEP_SUMMARY"
 
-# ────────────────────────────────────────────────
-# 9. Output for use in reporter comment
-# ────────────────────────────────────────────────
 echo "next_version=${NEXT_VERSION}" >> "$GITHUB_OUTPUT"
