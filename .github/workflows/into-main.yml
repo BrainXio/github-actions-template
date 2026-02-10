@@ -216,4 +216,18 @@ jobs:
           RUN_ID: ${{ github.run_id }}
           REPO: ${{ github.repository }}
           SERVER_URL: ${{ github.server_url }}
+
+          # Pre-compute status emojis in YAML (safe here)
+          VALIDATE_STATUS: ${{ needs.validate.result == 'success' && '✅' || '❌' }}
+          TEST_STATUS:     ${{ needs.test.result     == 'success' && '✅' || '❌' }}
+          PREVIEW_STATUS:  ${{ needs['release-preview'].result == 'success' && '✅' || '⚠️' }}
+          GUARD_STATUS:    ${{ needs['release-guard'].result == 'success' && '✅' || '⏭️' }}
+          RELEASE_STATUS:  ${{ needs.release.result   == 'success' && '🚀' || '❌' }}
+
+          # Pass results directly (fallback to 'skipped' if job didn't run)
+          VALIDATE_RESULT: ${{ needs.validate.result || 'skipped' }}
+          TEST_RESULT:     ${{ needs.test.result     || 'skipped' }}
+          PREVIEW_RESULT:  ${{ needs['release-preview'].result || 'skipped' }}
+          GUARD_RESULT:    ${{ needs['release-guard'].result || 'skipped' }}
+          RELEASE_RESULT:  ${{ needs.release.result   || 'skipped' }}
         run: .github/scripts/workflow_reporter.sh
