@@ -212,6 +212,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Chmod +x
+        run: chmod +x .github/scripts/workflow-reporter.sh
+
       - name: Summarize & report
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
