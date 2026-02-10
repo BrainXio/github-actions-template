@@ -76,7 +76,7 @@ jobs:
           echo "Greeting time: ${{ steps.testing.outputs.time }}"
 
   release:
-    name: Releasing
+    name: Release
     needs: [validate, testing]
     runs-on: ubuntu-latest
     permissions:
