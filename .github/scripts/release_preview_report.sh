@@ -6,34 +6,31 @@ set -euo pipefail
   echo ""
 
   if [[ "${JOB_STATUS:-unknown}" == "success" ]]; then
-    echo "**Status**: ✅ Dry-run OK"
+    echo "**Status**: ✅ Dry-run completed successfully"
   else
-    echo "**Status**: ⚠️ Dry-run issue"
+    echo "**Status**: ⚠️ Dry-run had issues (check job logs)"
   fi
 
-  if [[ -f dry-run.log ]]; then
-    echo ""
-    if grep -qiE 'no relevant changes|no new version' dry-run.log; then
-      echo "→ No release triggered"
-      NEXT_VERSION="none"
-    elif grep -qiE 'error|failed|ERR' dry-run.log; then
-      echo "→ Dry-run failed — check logs"
-      echo '```text'
-      tail -n 8 dry-run.log
-      echo '```'
-      NEXT_VERSION="failed"
-    else
-      # Extract version more reliably (common patterns in semantic-release output)
-      NEXT_VERSION=$(grep -oE '([0-9]+\.){2}[0-9]+(-[a-zA-Z0-9]+(\.[0-9]+)?)?' dry-run.log | head -1 || echo "unknown")
-      echo "→ Next version preview: **v${NEXT_VERSION}**"
-    fi
-  else
-    echo "→ No dry-run.log found"
-    NEXT_VERSION="missing"
-  fi
+  echo ""
+  echo "**Next version preview**: ${NEXT_VERSION:-unknown}"
+
+  case "$NEXT_VERSION" in
+    "no-release-pending")
+      echo "→ No commits qualify for a new release (e.g., no feat/fix/breaking changes since last tag)"
+      ;;
+    "failed")
+      echo "→ Dry-run failed — review the step logs above for errors"
+      ;;
+    "unknown"|"")
+      echo "→ Could not determine next version (unexpected output format)"
+      ;;
+    *)
+      echo "→ Would create release: **v${NEXT_VERSION}**"
+      ;;
+  esac
 
   echo ""
 } >> "$GITHUB_STEP_SUMMARY"
 
-# Write just the version for the final reporter
-echo "NEXT_VERSION=${NEXT_VERSION}" >> "$GITHUB_OUTPUT"
+# Optional: also set as step output if you want to use it in later steps of the same job
+echo "next_version=${NEXT_VERSION:-unknown}" >> "$GITHUB_OUTPUT"
