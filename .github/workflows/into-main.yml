@@ -116,6 +116,9 @@ jobs:
   quality:
     name: Quality & Security
     needs: [validation, testing]
+    permissions:
+      contents: read
+      security-events: read
     runs-on: ubuntu-24.04
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
     outputs:
@@ -136,7 +139,9 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4.32.2
         with:
-          languages: javascript,python,bash
+          languages: javascript,python  # Removed bash – not supported
+          # Optional: add 'actions' if you want workflow YAML security scans
+          # languages: javascript,python,actions
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4.32.2
