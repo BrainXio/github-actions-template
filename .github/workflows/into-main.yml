@@ -8,27 +8,24 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pull-requests: write
-  issues: write
-  statuses: write
+  contents: read  # Default; elevate per-job
 
 jobs:
-  validate:
-    name: Validate
-    runs-on: ubuntu-latest
+  validation:
+    name: Validation
+    runs-on: ubuntu-24.04
     outputs:
       status: ${{ steps.summary.outputs.status }}
       details: ${{ steps.summary.outputs.details }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6.0.2
 
       - name: Lint bash scripts
-        run: shellcheck --shell=bash src/*.sh .devcontainer/*.sh || true
+        run: shellcheck --shell=bash src/*.sh .devcontainer/*.sh
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up Python (for pre-commit or Python-based actions)
+        uses: actions/setup-python@v6.2.0
         with:
           python-version: '3.11'
 
@@ -36,18 +33,17 @@ jobs:
         run: pip install pre-commit
 
       - name: Cache pre-commit
-        uses: actions/cache@v4
+        uses: actions/cache@v5.0.3
         with:
           path: ~/.cache/pre-commit
-          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+          key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
 
       - name: Run pre-commit
-        id: pre-commit
-        run: pre-commit run --all-files --show-diff-on-failure || echo "pre-commit failed"
+        run: pre-commit run --all-files --show-diff-on-failure
 
       - name: Check PR title & commits
         if: github.event_name == 'pull_request'
-        uses: amannn/action-semantic-pull-request@v5
+        uses: amannn/action-semantic-pull-request@v6.1.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -63,16 +59,36 @@ jobs:
             echo "details=One or more validation steps failed (see logs)" >> "$GITHUB_OUTPUT"
           fi
 
-  test:
-    name: Test Action
-    needs: validate
-    runs-on: ubuntu-latest
+  testing:
+    name: Testing
+    needs: validation
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        include:
+          - lang: bash
+          - lang: node
+            node-version: '24.13.1'
+          - lang: python
+            python-version: '3.14.3'
     outputs:
       status: ${{ steps.summary.outputs.status }}
       details: ${{ steps.summary.outputs.details }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6.0.2
+
+      - name: Set up Node.js (if Node-based)
+        if: matrix.lang == 'node'
+        uses: actions/setup-node@v6.2.0
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Set up Python (if Python-based)
+        if: matrix.lang == 'python'
+        uses: actions/setup-python@v6.2.0
+        with:
+          python-version: ${{ matrix.python-version }}
 
       - name: Run action
         id: action
@@ -81,7 +97,6 @@ jobs:
           who-to-greet: '${{ github.event_name }} Runner'
 
       - name: Verify outputs
-        id: verify
         run: |
           echo "Event: ${{ github.event_name }}"
           echo "Greeting time: ${{ steps.action.outputs.time }}"
@@ -92,58 +107,42 @@ jobs:
         run: |
           if [[ "${{ job.status }}" == "success" ]]; then
             echo "status=✅ success" >> "$GITHUB_OUTPUT"
-            echo "details=Action test passed" >> "$GITHUB_OUTPUT"
+            echo "details=Action tests passed across matrices" >> "$GITHUB_OUTPUT"
           else
             echo "status=❌ failed" >> "$GITHUB_OUTPUT"
-            echo "details=Action test failed (see logs)" >> "$GITHUB_OUTPUT"
+            echo "details=Action tests failed (see logs)" >> "$GITHUB_OUTPUT"
           fi
 
-  release-preview:
-    name: Release Preview
-    needs: [validate, test]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
+  quality:
+    name: Quality & Security
+    needs: [validation, testing]
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
     outputs:
       status: ${{ steps.summary.outputs.status }}
       details: ${{ steps.summary.outputs.details }}
-      next_version: ${{ steps.dry-run.outputs.next_version }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6.0.2
+
+      - name: Dependency vulnerability scan
+        uses: aquasecurity/trivy-action@0.33.1
         with:
-          fetch-depth: 0
+          scan-type: 'fs'
+          format: 'table'
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4.32.2
         with:
-          node-version: '24'
+          languages: javascript,python,bash
 
-      - name: Install semantic-release
-        run: |
-          npm install --no-save \
-            semantic-release \
-            @semantic-release/commit-analyzer \
-            @semantic-release/release-notes-generator \
-            @semantic-release/changelog \
-            @semantic-release/github \
-            @semantic-release/git \
-            conventional-changelog-conventionalcommits
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4.32.2
 
-      - name: Run dry-run
-        id: dry-run
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          DRY_OUTPUT=$(npx semantic-release --dry-run 2>&1) || true
-          echo "$DRY_OUTPUT" > dry-run.log
-
-          NEXT_VERSION=$(echo "$DRY_OUTPUT" | \
-            grep -oE 'The next release version is [0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9\.]+)?' | \
-            awk '{print $5}' || echo "no-release-pending")
-
-          echo "next_version=$NEXT_VERSION" >> "$GITHUB_OUTPUT"
+      - name: Dependency review
+        uses: actions/dependency-review-action@v4.8.2
 
       - name: Set summary
         id: summary
@@ -151,7 +150,52 @@ jobs:
         run: |
           if [[ "${{ job.status }}" == "success" ]]; then
             echo "status=✅ success" >> "$GITHUB_OUTPUT"
-            echo "details=Dry-run completed. Next version: ${{ steps.dry-run.outputs.next_version }}" >> "$GITHUB_OUTPUT"
+            echo "details=All quality checks passed" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=❌ failed" >> "$GITHUB_OUTPUT"
+            echo "details=Quality checks failed (see logs)" >> "$GITHUB_OUTPUT"
+          fi
+
+  pre-release:
+    name: Pre-Release Preview
+    needs: [validation, testing, quality]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      status: ${{ steps.summary.outputs.status }}
+      details: ${{ steps.summary.outputs.details }}
+      next_version: ${{ steps.release.outputs.next_version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Semantic Release Dry-Run
+        id: release
+        uses: cycjimmy/semantic-release-action@v6.0.0
+        with:
+          dry_run: true
+          extra_plugins: |
+            @semantic-release/commit-analyzer
+            @semantic-release/release-notes-generator
+            @semantic-release/changelog
+            @semantic-release/github
+          branches: main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set summary
+        id: summary
+        if: always()
+        run: |
+          NEXT_VERSION=${{ steps.release.outputs.next_release_tag || 'no-release-pending' }}
+          echo "next_version=$NEXT_VERSION" >> "$GITHUB_OUTPUT"
+          if [[ "${{ job.status }}" == "success" ]]; then
+            echo "status=✅ success" >> "$GITHUB_OUTPUT"
+            echo "details=Dry-run completed. Next version: $NEXT_VERSION" >> "$GITHUB_OUTPUT"
           else
             echo "status=⚠️ issue" >> "$GITHUB_OUTPUT"
             echo "details=Dry-run had issues (check logs)" >> "$GITHUB_OUTPUT"
@@ -159,9 +203,9 @@ jobs:
 
   release:
     name: Release
-    needs: [validate, test, release-preview]
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [validation, testing, quality, pre-release]
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.pre-release.outputs.next_version != 'no-release-pending'
     permissions:
       contents: write
     outputs:
@@ -169,30 +213,27 @@ jobs:
       details: ${{ steps.summary.outputs.details }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6.0.2
         with:
           fetch-depth: 0
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Semantic Release
+        uses: cycjimmy/semantic-release-action@v6.0.0
         with:
-          node-version: '24'
-
-      - name: Install semantic-release
-        run: |
-          npm install --no-save \
-            semantic-release \
-            @semantic-release/commit-analyzer \
-            @semantic-release/release-notes-generator \
-            @semantic-release/changelog \
-            @semantic-release/github \
-            @semantic-release/git \
-            conventional-changelog-conventionalcommits
-
-      - name: Run release
+          extra_plugins: |
+            @semantic-release/commit-analyzer
+            @semantic-release/release-notes-generator
+            @semantic-release/changelog
+            @semantic-release/github
+          additional_options: |
+            {
+              "assets": [
+                {"path": "CHANGELOG.md", "label": "Changelog"}
+              ]
+            }
+          branches: main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx semantic-release
 
       - name: Set summary
         id: summary
@@ -206,17 +247,29 @@ jobs:
             echo "details=Release failed (check logs)" >> "$GITHUB_OUTPUT"
           fi
 
-  reporter:
-    name: Report Status
-    needs: [validate, test, release-preview, release]
+  reporting:
+    name: Reporting
+    needs: [validation, testing, quality, pre-release, release]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       pull-requests: write
     steps:
-      - name: Post or update PR comment
-        if: github.event_name == 'pull_request' && always()
-        uses: peter-evans/create-or-update-comment@v5
+      - name: Job Summary
+        run: |
+          {
+            echo '## Pipeline Summary'
+            echo "- Validation: \"${{ needs.validation.outputs.status }}\""
+            echo "- Testing: \"${{ needs.testing.outputs.status }}\""
+            echo "- Quality: \"${{ needs.quality.outputs.status }}\""
+            echo "- Pre-Release: \"${{ needs.pre-release.outputs.status }}\" (Next: \"${{ needs.pre-release.outputs.next_version }}\")"
+            echo "- Release: \"${{ needs.release.outputs.status }}\""
+            echo "🔗 [Workflow Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Post or Update PR Comment
+        if: github.event_name == 'pull_request'
+        uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           issue-number: ${{ github.event.pull_request.number }}
           body: |
@@ -226,21 +279,23 @@ jobs:
             **Run**: #${{ github.run_id }}
             **Last updated**: ${{ github.event.head_commit.timestamp || 'N/A' }}
 
-            **Next Release Preview**: ${{ needs.release-preview.outputs.next_version || 'unknown' }}
+            **Next Release Preview**: ${{ needs.pre-release.outputs.next_version || 'unknown' }}
 
             **Job Results**
 
             | Job              | Status | Result                  |
             |------------------|--------|-------------------------|
-            | Validate         | ${{ needs.validate.result == 'success' && '✅' || '❌' }} | ${{ needs.validate.outputs.status || 'N/A' }} |
-            | Test             | ${{ needs.test.result     == 'success' && '✅' || '❌' }} | ${{ needs.test.outputs.status || 'N/A' }}     |
-            | Release Preview  | ${{ needs['release-preview'].result == 'success' && '✅' || '⚠️' }} | ${{ needs['release-preview'].outputs.status || 'N/A' }} |
-            | Release          | ${{ needs.release.result   == 'success' && '🚀' || '❌' }} | ${{ needs.release.outputs.status || 'N/A' }} |
+            | Validation       | ${{ needs.validation.result == 'success' && '✅' || '❌' }} | ${{ needs.validation.outputs.status || 'N/A' }} |
+            | Testing          | ${{ needs.testing.result == 'success' && '✅' || '❌' }} | ${{ needs.testing.outputs.status || 'N/A' }}     |
+            | Quality          | ${{ needs.quality.result == 'success' && '✅' || '❌' }} | ${{ needs.quality.outputs.status || 'N/A' }}     |
+            | Pre-Release      | ${{ needs.pre-release.result == 'success' && '✅' || '⚠️' }} | ${{ needs.pre-release.outputs.status || 'N/A' }} |
+            | Release          | ${{ needs.release.result == 'success' && '🚀' || '❌' }} | ${{ needs.release.outputs.status || 'N/A' }}     |
 
             **Details**
-            - Validate: ${{ needs.validate.outputs.details || 'N/A' }}
-            - Test: ${{ needs.test.outputs.details || 'N/A' }}
-            - Release Preview: ${{ needs['release-preview'].outputs.details || 'N/A' }}
+            - Validation: ${{ needs.validation.outputs.details || 'N/A' }}
+            - Testing: ${{ needs.testing.outputs.details || 'N/A' }}
+            - Quality: ${{ needs.quality.outputs.details || 'N/A' }}
+            - Pre-Release: ${{ needs.pre-release.outputs.details || 'N/A' }}
             - Release: ${{ needs.release.outputs.details || 'N/A' }}
 
             See logs in Actions UI for full details.
