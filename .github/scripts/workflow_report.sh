@@ -7,10 +7,9 @@ set -euo pipefail
 : "${REPO:?Missing REPO}"
 : "${SERVER_URL:?Missing SERVER_URL}"
 
-# Optional / fallback
 PR_NUMBER="${PR_NUMBER:-}"
 
-# Build the summary (double quotes = variables expand)
+# Build the summary — double quotes so variables expand
 SUMMARY="# Workflow Summary – ${EVENT_NAME^}
 
 **Repository**: ${REPO}
@@ -33,15 +32,15 @@ See individual job summaries and logs in the Actions UI for more details.
 This comment is automatically updated by the **Report Status** job.
 "
 
-# Always show in console / logs
+# Always log to console
 echo -e "$SUMMARY"
 
-# Only set output if it's a pull_request (prevents error on main/schedule/etc.)
+# Only set output on pull_request events
 if [[ "$EVENT_NAME" == "pull_request" && -n "$PR_NUMBER" ]]; then
-  echo "PR detected → setting comment body output"
-  echo "comment-body=$SUMMARY" >> "$GITHUB_OUTPUT"
+  echo "PR detected → writing comment body to file"
+  echo -e "$SUMMARY" > reporter-comment.md
 else
-  echo "Not a pull_request event or no PR number → no comment output set"
+  echo "Not a pull_request event or no PR number → skipping comment file"
 fi
 
-echo "workflow_reporter.sh finished."
+echo "workflow_report.sh finished."
