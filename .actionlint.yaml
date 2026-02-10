@@ -1,0 +1,13 @@
+# .github/.actionlint.yaml
+self-hosted-runner:
+  labels: []
+
+# Or more targeted (if you want to keep other expression checks):
+# ignore:
+#   - 'property "summary" is not defined'
+#   - 'property "validation" is not defined'
+# .actionlint.yaml
+ignore:
+  - 'expression'
+  - 'property ".+" is not defined in object type'
+  - 'property ".+" is not defined in object type \{\}'

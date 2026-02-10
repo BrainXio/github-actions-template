@@ -1,0 +1,387 @@
+name: Into Main
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read  # Default; elevate per-job
+
+jobs:
+  check:
+    name: File Detection
+    runs-on: ubuntu-24.04
+    outputs:
+      bash_files: ${{ steps.detect.outputs.bash_files }}
+      python_files: ${{ steps.detect.outputs.python_files }}
+      js_files: ${{ steps.detect.outputs.js_files }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Detect files
+        id: detect
+        run: |
+          set -euo pipefail
+          BASH_FILES=$(find . -type f -name "*.sh" | tr '\n' ' ' || true)
+          PYTHON_FILES=$(find . -type f -name "*.py" | tr '\n' ' ' || true)
+          JS_FILES=$(find . -type f -name "*.js" -or -name "*.ts" | tr '\n' ' ' || true)
+          {
+            echo "bash_files=$BASH_FILES"
+            echo "python_files=$PYTHON_FILES"
+            echo "js_files=$JS_FILES"
+          } >> "$GITHUB_OUTPUT"
+
+  validation:
+    name: Validation
+    runs-on: ubuntu-24.04
+    needs: check
+    outputs:
+      status: ${{ steps.summary.outputs.status }}
+      details: ${{ steps.summary.outputs.details }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      # ────────────── Bash ──────────────
+      - name: Lint bash scripts
+        run: |
+          set -euo pipefail
+          files="${{ needs.check.outputs.bash_files }}"
+          if [[ -n "$files" ]]; then
+            shellcheck --shell=bash $files
+          else
+            echo "No bash scripts found to lint"
+          fi
+
+      # ────────────── Setup shared environments ──────────────
+      - name: Set up Python
+        uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.14'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6.2.0
+        with:
+          node-version: '24'
+
+      # ────────────── Python linting (Ruff) ──────────────
+      - name: Lint Python files (Ruff)
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          pip install ruff
+          files="${{ needs.check.outputs.python_files }}"
+          if [[ -n "$files" ]]; then
+            ruff check --output-format=github $files     # github format is CI-friendly
+            ruff format --check $files
+          else
+            echo "No Python files found to lint"
+          fi
+
+      # ────────────── JavaScript linting (ESLint) ──────────────
+      - name: Lint JavaScript files (ESLint)
+        run: |
+          set -euo pipefail
+          npm install --no-save eslint@9.13.0 @eslint/js@9.13.0 globals@15
+          files="${{ needs.check.outputs.js_files }}"
+          if [[ -n "$files" ]]; then
+            npx eslint --format stylish $files
+          else
+            echo "No JavaScript/TypeScript files found to lint"
+          fi
+
+      # ────────────── pre-commit ──────────────
+      - name: Install pre-commit
+        run: pip install pre-commit
+
+      - name: Cache pre-commit
+        uses: actions/cache@v5.0.3
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
+
+      - name: Run pre-commit
+        run: pre-commit run --all-files --show-diff-on-failure
+
+      - name: Check PR title & commits
+        if: github.event_name == 'pull_request'
+        uses: amannn/action-semantic-pull-request@v6.1.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set summary
+        id: summary
+        if: always()
+        run: |
+          if [[ "${{ job.status }}" == "success" ]]; then
+            echo "status=✅ success" >> "$GITHUB_OUTPUT"
+            echo "details=All validation checks passed" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=❌ failed" >> "$GITHUB_OUTPUT"
+            echo "details=One or more validation steps failed (see logs)" >> "$GITHUB_OUTPUT"
+          fi
+
+  testing:
+    name: Testing
+    needs: validation
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        include:
+          - lang: bash
+          - lang: node
+            node-version: '24.13.1'
+          - lang: python
+            python-version: '3.14.3'
+    outputs:
+      status: ${{ steps.summary.outputs.status }}
+      details: ${{ steps.summary.outputs.details }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Set up Node.js (pre-install if needed)
+        if: matrix.lang == 'node'
+        uses: actions/setup-node@v6.2.0
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Set up Python (pre-install if needed)
+        if: matrix.lang == 'python'
+        uses: actions/setup-python@v6.2.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Run action with selected language
+        id: action
+        uses: ./
+        with:
+          who-to-greet: '${{ github.event_name }} Runner'
+          language: ${{ matrix.lang }}
+
+      - name: Verify outputs
+        run: |
+          echo "Language variant: ${{ matrix.lang }}"
+          echo "Event: ${{ github.event_name }}"
+
+          TIME="${{ steps.action.outputs.time }}"
+
+          echo "Greeting time: $TIME"
+
+          if [ -z "$TIME" ]; then
+            echo "Missing time output from action!" >&2
+            exit 1
+          fi
+
+      - name: Set summary
+        id: summary
+        if: always()
+        run: |
+          if [[ "${{ job.status }}" == "success" ]]; then
+            echo "status=✅ success" >> "$GITHUB_OUTPUT"
+            echo "details=Action tests passed for ${{ matrix.lang }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=❌ failed" >> "$GITHUB_OUTPUT"
+            echo "details=Action test failed for ${{ matrix.lang }} (see logs)" >> "$GITHUB_OUTPUT"
+          fi
+
+  quality:
+    name: Quality & Security
+    needs: [validation, testing]
+    permissions:
+      contents: read
+      security-events: read
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['javascript-typescript', 'python']
+    outputs:
+      status: ${{ steps.summary.outputs.status }}
+      details: ${{ steps.summary.outputs.details }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Dependency vulnerability scan
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          scan-type: 'fs'
+          format: 'table'
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4.32.2
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4.32.2
+        with:
+          category: "/language:${{ matrix.language }}"
+
+      - name: Dependency review
+        uses: actions/dependency-review-action@v4.8.2
+
+      - name: Set summary
+        id: summary
+        if: always()
+        run: |
+          if [[ "${{ job.status }}" == "success" ]]; then
+            echo "status=✅ success" >> "$GITHUB_OUTPUT"
+            echo "details=All quality checks passed" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=❌ failed" >> "$GITHUB_OUTPUT"
+            echo "details=Quality checks failed (see logs)" >> "$GITHUB_OUTPUT"
+          fi
+
+  pre-release:
+    name: Pre-Release Preview
+    needs: [validation, testing, quality]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      status: ${{ steps.summary.outputs.status }}
+      details: ${{ steps.summary.outputs.details }}
+      next_version: ${{ steps.release.outputs.next_version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Semantic Release Dry-Run
+        id: release
+        uses: cycjimmy/semantic-release-action@v6.0.0
+        with:
+          dry_run: true
+          extra_plugins: |
+            @semantic-release/commit-analyzer
+            @semantic-release/release-notes-generator
+            @semantic-release/changelog
+            @semantic-release/github
+          branches: main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set summary
+        id: summary
+        if: always()
+        run: |
+          NEXT_VERSION=${{ steps.release.outputs.next_release_tag || 'no-release-pending' }}
+          echo "next_version=$NEXT_VERSION" >> "$GITHUB_OUTPUT"
+          if [[ "${{ job.status }}" == "success" ]]; then
+            echo "status=✅ success" >> "$GITHUB_OUTPUT"
+            echo "details=Dry-run completed. Next version: $NEXT_VERSION" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=⚠️ issue" >> "$GITHUB_OUTPUT"
+            echo "details=Dry-run had issues (check logs)" >> "$GITHUB_OUTPUT"
+          fi
+
+  release:
+    name: Release
+    needs: [validation, testing, quality, pre-release]
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.pre-release.outputs.next_version != 'no-release-pending'
+    permissions:
+      contents: write
+    outputs:
+      status: ${{ steps.summary.outputs.status }}
+      details: ${{ steps.summary.outputs.details }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Semantic Release
+        uses: cycjimmy/semantic-release-action@v6.0.0
+        with:
+          extra_plugins: |
+            @semantic-release/commit-analyzer
+            @semantic-release/release-notes-generator
+            @semantic-release/changelog
+            @semantic-release/github
+          additional_options: |
+            {
+              "assets": [
+                {"path": "CHANGELOG.md", "label": "Changelog"}
+              ]
+            }
+          branches: main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set summary
+        id: summary
+        if: always()
+        run: |
+          if [[ "${{ job.status }}" == "success" ]]; then
+            echo "status=🚀 published" >> "$GITHUB_OUTPUT"
+            echo "details=Release published successfully" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=❌ failed" >> "$GITHUB_OUTPUT"
+            echo "details=Release failed (check logs)" >> "$GITHUB_OUTPUT"
+          fi
+
+  reporting:
+    name: Reporting
+    needs: [validation, testing, quality, pre-release, release]
+    if: always()
+    runs-on: ubuntu-24.04
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Job Summary
+        run: |
+          {
+            echo '## Pipeline Summary'
+            echo "- Validation: \"${{ needs.validation.outputs.status }}\""
+            echo "- Testing: \"${{ needs.testing.outputs.status }}\""
+            echo "- Quality: \"${{ needs.quality.outputs.status }}\""
+            echo "- Pre-Release: \"${{ needs.pre-release.outputs.status }}\" (Next: \"${{ needs.pre-release.outputs.next_version }}\")"
+            echo "- Release: \"${{ needs.release.outputs.status }}\""
+            echo "🔗 [Workflow Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Post or Update PR Comment
+        if: github.event_name == 'pull_request'
+        uses: peter-evans/create-or-update-comment@v5.0.0
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            ### Workflow Summary – Pull Request
+
+            **Repository**: ${{ github.repository }}
+            **Run**: #${{ github.run_id }}
+            **Last updated**: ${{ github.event.head_commit.timestamp || 'N/A' }}
+
+            **Next Release Preview**: ${{ needs.pre-release.outputs.next_version || 'unknown' }}
+
+            **Job Results**
+
+            | Job              | Status | Result                  |
+            |------------------|--------|-------------------------|
+            | Validation       | ${{ needs.validation.result == 'success' && '✅' || '❌' }} | ${{ needs.validation.outputs.status || 'N/A' }} |
+            | Testing          | ${{ needs.testing.result == 'success' && '✅' || '❌' }} | ${{ needs.testing.outputs.status || 'N/A' }}     |
+            | Quality          | ${{ needs.quality.result == 'success' && '✅' || '❌' }} | ${{ needs.quality.outputs.status || 'N/A' }}     |
+            | Pre-Release      | ${{ needs.pre-release.result == 'success' && '✅' || '⚠️' }} | ${{ needs.pre-release.outputs.status || 'N/A' }} |
+            | Release          | ${{ needs.release.result == 'success' && '🚀' || '❌' }} | ${{ needs.release.outputs.status || 'N/A' }}     |
+
+            **Details**
+            - Validation: ${{ needs.validation.outputs.details || 'N/A' }}
+            - Testing: ${{ needs.testing.outputs.details || 'N/A' }}
+            - Quality: ${{ needs.quality.outputs.details || 'N/A' }}
+            - Pre-Release: ${{ needs.pre-release.outputs.details || 'N/A' }}
+            - Release: ${{ needs.release.outputs.details || 'N/A' }}
+
+            See logs in Actions UI for full details.
+          edit-mode: replace
