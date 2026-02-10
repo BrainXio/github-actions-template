@@ -124,9 +124,9 @@ jobs:
           echo "$DRY_OUTPUT" > dry-run.log
 
           if [ $EXIT_CODE -eq 0 ]; then
-            node .github/scripts/dry-release-evaluator.js <<< "$DRY_OUTPUT" >> "$GITHUB_OUTPUT" || {
+            echo "$DRY_OUTPUT" | .github/scripts/release-preview-reporter.sh >> "$GITHUB_OUTPUT" || {
               echo "status=failed" >> "$GITHUB_OUTPUT"
-              printf "result=%b\n" "**Parser failed** — see dry-run.log artifact" >> "$GITHUB_OUTPUT"
+              echo "result=**Evaluator script failed** — see dry-run.log artifact" >> "$GITHUB_OUTPUT"
             }
           else
             echo "status=failed" >> "$GITHUB_OUTPUT"
@@ -212,9 +212,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Chmod +x
-        run: chmod +x .github/scripts/workflow-reporter.sh
-
       - name: Summarize & report
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -223,6 +220,4 @@ jobs:
           RUN_ID: ${{ github.run_id }}
           REPO: ${{ github.repository }}
           SERVER_URL: ${{ github.server_url }}
-          # These are automatically set by GitHub for needs.*
-          # But to be explicit in Bash, you can also pass them if needed
         run: .github/scripts/workflow-reporter.sh
