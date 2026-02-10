@@ -2,15 +2,11 @@
   "branches": [
     "main",
     {
-      "name": "next",
-      "prerelease": "next"
-    },
-    {
-      "name": "beta",
+      "name": "fix/**",
       "prerelease": "beta"
     },
     {
-      "name": "alpha",
+      "name": "feat/**",
       "prerelease": "alpha"
     }
   ],
@@ -29,6 +25,5 @@
   ],
   "preset": "conventionalcommits",
   "tagFormat": "v${version}",
-  "ci": true,
-  "debug": false
+  "ci": true
 }
