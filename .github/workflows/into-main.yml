@@ -167,9 +167,12 @@ jobs:
         run: |
           echo "Language variant: ${{ matrix.lang }}"
           echo "Event: ${{ github.event_name }}"
-          echo "Greeting time: ${{ steps.action.outputs.time }}"
-          if [ -z "${{ steps.action.outputs.time }}" ]; then
-            echo "Missing time output!" >&2
+
+          TIME_OUTPUT=$(grep '^time=' "$GITHUB_OUTPUT" | cut -d= -f2- || echo "")
+          echo "Greeting time: $TIME_OUTPUT"
+
+          if ! grep -q '^time=' "$GITHUB_OUTPUT"; then
+            echo "Missing 'time' key in outputs!" >&2
             exit 1
           fi
 
