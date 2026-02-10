@@ -23,8 +23,8 @@ set -euo pipefail
       echo '```'
       NEXT_VERSION="failed"
     else
-      # Extract version more reliably (common patterns in semantic-release output)
-      NEXT_VERSION=$(grep -oE '([0-9]+\.){2}[0-9]+(-[a-zA-Z0-9]+(\.[0-9]+)?)?' dry-run.log | head -1 || echo "unknown")
+      # More specific grep for semantic-release output
+      NEXT_VERSION=$(grep -Ei 'next release version is' dry-run.log | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[a-z0-9]+(\.[0-9]+)?)?' | head -1 || echo "unknown")
       echo "→ Next version preview: **v${NEXT_VERSION}**"
     fi
   else
@@ -35,5 +35,5 @@ set -euo pipefail
   echo ""
 } >> "$GITHUB_STEP_SUMMARY"
 
-# Write just the version for the final reporter
-echo "NEXT_VERSION=${NEXT_VERSION}" >> "$GITHUB_OUTPUT"
+# Set as job output for reporter
+echo "next_version=${NEXT_VERSION}" >> "$GITHUB_OUTPUT"

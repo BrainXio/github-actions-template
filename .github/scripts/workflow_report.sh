@@ -34,10 +34,10 @@ See individual job summaries and logs in the Actions UI for more details.
 This comment is automatically updated by the **Report Status** job.
 "
 
-# Always log to console
+# Always show in console / logs
 echo -e "$SUMMARY"
 
-# Only set output on pull_request events
+# Only write file if it's a pull_request (prevents error on main/schedule/etc.)
 if [[ "$EVENT_NAME" == "pull_request" && -n "$PR_NUMBER" ]]; then
   echo "PR detected → writing comment body to file"
   echo -e "$SUMMARY" > reporter-comment.md

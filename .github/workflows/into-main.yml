@@ -94,6 +94,8 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+    outputs:
+          next_version: ${{ steps.report.outputs.next_version }}
     if: >
       github.event_name == 'push' ||
       github.event_name == 'pull_request' ||
@@ -135,6 +137,7 @@ jobs:
         run: npx semantic-release --dry-run > dry-run.log 2>&1 || true
 
       - name: Generate report
+        id: report
         if: always()
         env:
           JOB_STATUS: ${{ job.status }}
@@ -228,6 +231,7 @@ jobs:
           PREVIEW_RESULT:  ${{ needs['release-preview'].result || 'skipped' }}
           GUARD_RESULT:    ${{ needs['release-guard'].result || 'skipped' }}
           RELEASE_RESULT:  ${{ needs.release.result   || 'skipped' }}
+          NEXT_VERSION: ${{ needs['release-preview'].outputs.next_version || 'unknown' }}
         run: .github/scripts/workflow_report.sh
 
       - name: Post or update PR comment
