@@ -75,11 +75,19 @@ jobs:
           echo "Event: ${{ github.event_name }}"
           echo "Greeting time: ${{ steps.test-action.outputs.time }}"
 
-  release-dry-run:
-    name: Release Dry Run
+  release:
+    name: Release (Dry-Run + Live)
     needs: [validate, test-action]
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    permissions:
+      contents: write          # Needed for real release (tag + release creation)
+      pull-requests: write     # For commenting on PRs
+      issues: write            # Optional, if needed
+    if: >
+      github.event_name == 'push' ||
+      github.event_name == 'pull_request' ||
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -90,6 +98,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'  # Optional: speeds up repeated installs
 
       - name: Install semantic-release and plugins
         run: |
@@ -107,24 +116,34 @@ jobs:
         continue-on-error: true
         run: |
           DRY_OUTPUT="$(npx semantic-release --dry-run 2>&1)"
-          EXIT_CODE=$?
+          EXIT_CODE="$?"
+
+          # Save full output as artifact for debugging
+          echo "$DRY_OUTPUT" > dry-run-full.log
 
           if [ $EXIT_CODE -eq 0 ]; then
-            STATUS="passed"
-            NEXT_VERSION=$(echo "$DRY_OUTPUT" | grep -oP '(?<=next release version: ).*' || echo "No release detected")
-            CHANGELOG_PREVIEW=$(echo "$DRY_OUTPUT" | grep -A 10 "Release notes" || echo "No changelog preview available")
-            RESULT="**Passed!** Next version would be: **$NEXT_VERSION**\n\n**Changelog preview:**\n\`\`\`\n$CHANGELOG_PREVIEW\n\`\`\`"
+            # Parse with Node script
+            node .github/scripts/parse-semantic-dry-run.js <<< "$DRY_OUTPUT" >> "$GITHUB_OUTPUT" || {
+              echo "status=failed" >> "$GITHUB_OUTPUT"
+              printf "result=%b\n" "**Parsing failed** — check workflow logs for dry-run-full.log artifact" >> "$GITHUB_OUTPUT"
+            }
           else
-            STATUS="failed"
-            RESULT="**Dry-run failed**\n\nError output:\n\`\`\`\n$DRY_OUTPUT\n\`\`\`"
+            echo "status=failed" >> "$GITHUB_OUTPUT"
+            ERROR_PREVIEW=$(echo "$DRY_OUTPUT" | tail -n 30)
+            printf "result=%b\n" "**Dry-run failed** (exit $EXIT_CODE)\n\nError preview:\n\`\`\`text\n$ERROR_PREVIEW\n\`\`\`" >> "$GITHUB_OUTPUT"
           fi
-
-          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
-          echo "result=$RESULT" >> "$GITHUB_OUTPUT"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Post dry-run result to PR
+      - name: Upload dry-run log artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: semantic-dry-run-log
+          path: dry-run-full.log
+          retention-days: 7
+
+      - name: Post dry-run result to PR (if applicable)
         if: github.event_name == 'pull_request' && always()
         uses: peter-evans/create-or-update-comment@v5
         with:
@@ -133,36 +152,14 @@ jobs:
             ### Release Dry-Run Outcome
             ${{ steps.dry-run.outputs.result }}
 
-  release:
-    name: Release
-    needs: [validate, test-action, release-dry-run]
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref_type == 'branch' || github.event_name == 'release' || github.ref_type == 'tag'
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install semantic-release and plugins
+      - name: Guard - only proceed to live release on qualifying events
+        if: steps.dry-run.outputs.status != 'passed' || ! (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'release')
         run: |
-          npm install \
-            semantic-release \
-            @semantic-release/commit-analyzer \
-            @semantic-release/release-notes-generator \
-            @semantic-release/changelog \
-            @semantic-release/github \
-            @semantic-release/git \
-            conventional-changelog-conventionalcommits
+          echo "Skipping live release: dry-run failed or not on main/release trigger"
+          exit 0
 
-      - name: Run semantic-release
+      - name: Run semantic-release (live)
+        if: steps.dry-run.outputs.status == 'passed'  # Optional safety
         run: npx semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
