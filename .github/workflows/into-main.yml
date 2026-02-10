@@ -227,7 +227,7 @@ jobs:
           PREVIEW_RESULT:  ${{ needs['release-preview'].result || 'skipped' }}
           GUARD_RESULT:    ${{ needs['release-guard'].result || 'skipped' }}
           RELEASE_RESULT:  ${{ needs.release.result   || 'skipped' }}
-        run: .github/scripts/workflow_reporter.sh
+        run: .github/scripts/workflow_report.sh
 
       - name: Post or update PR comment
         if: github.event_name == 'pull_request' && always()
