@@ -124,7 +124,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: ['javascript-typescript', 'python']  # Add 'actions' later if needed for workflow YAML scans
+        language: ['javascript-typescript', 'python']
     outputs:
       status: ${{ steps.summary.outputs.status }}
       details: ${{ steps.summary.outputs.details }}
