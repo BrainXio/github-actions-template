@@ -11,9 +11,34 @@ permissions:
   contents: read  # Default; elevate per-job
 
 jobs:
+  check:
+    name: File Detection
+    runs-on: ubuntu-24.04
+    outputs:
+      bash_files: ${{ steps.detect.outputs.bash_files }}
+      python_files: ${{ steps.detect.outputs.python_files }}
+      js_files: ${{ steps.detect.outputs.js_files }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Detect files
+        id: detect
+        run: |
+          set -euo pipefail
+          BASH_FILES=$(find . -type f -name "*.sh" | tr '\n' ' ' || true)
+          PYTHON_FILES=$(find . -type f -name "*.py" | tr '\n' ' ' || true)
+          JS_FILES=$(find . -type f -name "*.js" -or -name "*.ts" | tr '\n' ' ' || true)
+          {
+            echo "bash_files=$BASH_FILES"
+            echo "python_files=$PYTHON_FILES"
+            echo "js_files=$JS_FILES"
+          } >> "$GITHUB_OUTPUT"
+
   validation:
     name: Validation
     runs-on: ubuntu-24.04
+    needs: check
     outputs:
       status: ${{ steps.summary.outputs.status }}
       details: ${{ steps.summary.outputs.details }}
@@ -25,10 +50,9 @@ jobs:
       - name: Lint bash scripts
         run: |
           set -euo pipefail
-          files=(src/composite/*.sh src/*.sh .devcontainer/*.sh)
-          shopt -s nullglob
-          if ((${#files[@]} > 0)); then
-            shellcheck --shell=bash "${files[@]}"
+          files="${{ needs.check.outputs.bash_files }}"
+          if [[ -n "$files" ]]; then
+            shellcheck --shell=bash $files
           else
             echo "No bash scripts found to lint"
           fi
@@ -50,10 +74,10 @@ jobs:
           set -euo pipefail
           python -m pip install --upgrade pip
           pip install ruff
-          files=(src/python/*.py)
-          if ((${#files[@]} > 0)); then
-            ruff check --output-format=text "${files[@]}"
-            ruff format --check "${files[@]}"
+          files="${{ needs.check.outputs.python_files }}"
+          if [[ -n "$files" ]]; then
+            ruff check --output-format=text $files
+            ruff format --check $files
           else
             echo "No Python files found to lint"
           fi
@@ -63,14 +87,14 @@ jobs:
         run: |
           set -euo pipefail
           npm install --no-save eslint@9 @eslint/js globals
-          files=(src/node/*.js src/node/*.ts)
-          if ((${#files[@]} > 0)); then
-            npx eslint --format stylish "${files[@]}"
+          files="${{ needs.check.outputs.js_files }}"
+          if [[ -n "$files" ]]; then
+            npx eslint --format stylish $files
           else
             echo "No JavaScript/TypeScript files found to lint"
           fi
 
-      # ────────────── pre-commit (can include black, eslint, etc. via hooks) ──────────────
+      # ────────────── pre-commit ──────────────
       - name: Install pre-commit
         run: pip install pre-commit
 
@@ -144,7 +168,6 @@ jobs:
           echo "Language variant: ${{ matrix.lang }}"
           echo "Event: ${{ github.event_name }}"
           echo "Greeting time: ${{ steps.action.outputs.time }}"
-          # Optional: add failure if output missing
           if [ -z "${{ steps.action.outputs.time }}" ]; then
             echo "Missing time output!" >&2
             exit 1

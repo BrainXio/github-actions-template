@@ -1,14 +1,14 @@
 # .pre-commit-config.yaml
-# Multi-language starter for GitHub Actions template (bash, node, python)
-# Run `pre-commit autoupdate` periodically to bump revs
+# Multi-language starter for GitHub Actions template
+# No hardcoded paths — hooks use default extension/type matching
 
 repos:
-  # General / cross-language hooks
+  # General / cross-language hooks (run on all relevant files)
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v6.0.0  # Latest as of mid-2025; autoupdate may bump to v6.x/v7.x
+    rev: v6.0.0
     hooks:
       - id: check-yaml
-        args: [--allow-multiple-documents]  # Handles multi-doc workflows
+        args: [--allow-multiple-documents]
       - id: end-of-file-fixer
       - id: trailing-whitespace
       - id: check-added-large-files
@@ -17,50 +17,44 @@ repos:
       - id: mixed-line-ending
         args: [--fix=lf]
 
-  # ShellCheck for bash scripts
+  # ShellCheck – automatically runs on any .sh file
   - repo: https://github.com/koalaman/shellcheck-precommit
-    rev: v0.11.0  # Current stable as of early 2026
+    rev: v0.11.0
     hooks:
       - id: shellcheck
         args: [--severity=warning, --format=gcc]
-        files: ^(src/(composite|bash)/.*\.sh|\.devcontainer/.*\.sh|scripts/.*\.sh)$
 
-  # Ruff for Python (lint + auto-format)
+  # Ruff for Python – automatically runs on any .py file
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.0  # Latest as of Feb 2026 (check repo for newer)
+    rev: v0.15.0
     hooks:
       - id: ruff
-        args: [--fix, --exit-non-zero-on-fix]  # Auto-fix where possible
-        files: ^src/python/.*\.py$
+        args: [--fix, --exit-non-zero-on-fix]
       - id: ruff-format
-        files: ^src/python/.*\.py$
 
-  # ESLint for JavaScript/TypeScript
+  # ESLint for JavaScript/TypeScript – automatically runs on .js/.ts/.jsx/.tsx
   - repo: https://github.com/pre-commit/mirrors-eslint
     rev: v9.13.0
     hooks:
       - id: eslint
-        files: ^src/node/.*\.(js|jsx|ts|tsx)$
         types: [file]
-        # Remove this block - no deps needed for bare config
-        # additional_dependencies:
-        #   - eslint@9.13.0
+        # No files: pattern — mirror defaults to common JS/TS extensions
+        # No additional_dependencies — minimal config doesn't need them
 
-  # actionlint for GitHub Workflows
+  # actionlint – automatically runs on workflow YAML files
   - repo: https://github.com/rhysd/actionlint
-    rev: v1.7.10  # Latest as of late 2025/early 2026
+    rev: v1.7.10
     hooks:
       - id: actionlint
-        files: ^\.github/workflows/.*\.ya?ml$
 
-  # Markdown linting (for docs/README)
+  # Markdown linting – automatically runs on .md / .markdown
   - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.47.0  # Current as of Dec 2025
+    rev: v0.47.0
     hooks:
       - id: markdownlint
-        args: ['--config', '.markdownlint.json']  # Add .markdownlint.json if needed
+        args: ['--config', '.markdownlint.json']  # optional
 
-  # Secret scanning (optional but good practice)
+  # Secret scanning – runs on all files (good default)
   - repo: https://github.com/Yelp/detect-secrets
     rev: v1.5.0
     hooks:
