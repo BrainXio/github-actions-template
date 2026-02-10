@@ -18,6 +18,7 @@ permissions:
   pull-requests: write
   issues: write
   statuses: write
+  id-token: write          # optional – useful for future OIDC auth
 
 jobs:
   validate:
@@ -93,11 +94,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    if: >
-      github.event_name == 'push' ||
-      github.event_name == 'pull_request' ||
-      github.event_name == 'workflow_dispatch' ||
-      github.event_name == 'schedule'
+    if: github.event_name != 'release'  # no need to run preview during published release event
     outputs:
       next_version: ${{ steps.extract-version.outputs.next_version }}
     steps:
@@ -124,23 +121,37 @@ jobs:
 
       - name: Dry-run semantic-release & extract next version
         id: extract-version
+        shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
+
+          echo "Running semantic-release dry-run..."
           DRY_OUTPUT=$(npx semantic-release --dry-run 2>&1) || true
-          echo "$DRY_OUTPUT"  # for visibility in logs
 
-          NEXT_VERSION=$(echo "$DRY_OUTPUT" | grep -oP 'The next release version is \K\S+' || echo "no-release-pending")
+          echo "$DRY_OUTPUT" > dry-run.log
+          echo "=== Full dry-run output (for debugging) ==="
+          cat dry-run.log
+          echo "========================================"
 
-          echo "Next version preview: $NEXT_VERSION"
+          # Robust extraction: match version including prerelease tags
+          NEXT_VERSION=$(echo "$DRY_OUTPUT" | \
+            grep -oE 'The next release version is [0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9\.]*)?' | \
+            awk '{print $5}' || echo "")
+
+          # Fallback: grab the last semver-like string if above fails
+          if [[ -z "$NEXT_VERSION" ]]; then
+            NEXT_VERSION=$(echo "$DRY_OUTPUT" | \
+              grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9\.]*)?' | \
+              tail -n 1 || echo "no-release-pending")
+          fi
+
+          # Normalize empty → no-release-pending
+          [[ -z "$NEXT_VERSION" ]] && NEXT_VERSION="no-release-pending"
+
+          echo "Extracted next version: $NEXT_VERSION"
           echo "next_version=$NEXT_VERSION" >> "$GITHUB_OUTPUT"
-
-      - name: Generate report
-        if: always()
-        env:
-          JOB_STATUS: ${{ job.status }}
-          NEXT_VERSION: ${{ steps.extract-version.outputs.next_version }}
-        run: .github/scripts/release_preview_report.sh
 
   release-guard:
     name: Release Guard
@@ -169,6 +180,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      issues: write
+      pull-requests: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -232,7 +245,7 @@ jobs:
           PREVIEW_RESULT:  ${{ needs['release-preview'].result || 'skipped' }}
           GUARD_RESULT:    ${{ needs['release-guard'].result || 'skipped' }}
           RELEASE_RESULT:  ${{ needs.release.result   || 'skipped' }}
-          NEXT_VERSION:    ${{ needs['release-preview'].outputs.next_version || 'unknown' }}
+          NEXT_VERSION:    ${{ needs['release-preview'].outputs.next_version || 'no-release-pending' }}
         run: .github/scripts/workflow_report.sh
 
       - name: Post or update PR comment
