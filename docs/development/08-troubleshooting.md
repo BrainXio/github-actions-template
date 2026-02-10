@@ -23,7 +23,7 @@ Quick fixes for the most common issues you’ll hit while using this GitHub Acti
 
 **act: “no stages to run”**
 → Ensure `action.yml` exists in repo root
-→ Check workflow path: `.github/workflows/ci.yml`
+→ Check workflow path: `.github/workflows/into-main.yml`
 → Verify job name & uses: `composite` in `action.yml`
 
 **Outputs not visible / not set**

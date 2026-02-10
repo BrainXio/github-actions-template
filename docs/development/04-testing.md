@@ -40,19 +40,19 @@ All commands use `--quiet --verbose` by default for clean yet informative output
 
 ```bash
 # Basic push event
-act push -W .github/workflows/ci.yml
+act push -W .github/workflows/into-main.yml
 
 # Manual dispatch with custom input
 act workflow_dispatch --input who-to-greet=Developer
 
 # Pull request simulation
-act pull_request --eventpath .github/events/pull-request-local.json -W .github/workflows/ci.yml
+act pull_request --eventpath .github/events/pull-request-local.json -W .github/workflows/into-main.yml
 
 # Verbose debugging
-act push -W .github/workflows/ci.yml --verbose
+act push -W .github/workflows/into-main.yml --verbose
 
 # Run only the test-action job
-act push -j test-action -W .github/workflows/ci.yml
+act push -j test-action -W .github/workflows/into-main.yml
 ```
 
 ## What to look for after a test run
