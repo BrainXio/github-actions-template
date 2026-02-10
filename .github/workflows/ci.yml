@@ -24,83 +24,86 @@ jobs:
     name: Validate
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - name: Checkout
+        uses: actions/checkout@v6
 
       - name: Lint bash scripts
         run: shellcheck --shell=bash src/*.sh .devcontainer/*.sh || true
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
       - name: Install pre-commit
         run: pip install pre-commit
 
-      - name: Cache pre-commit environments
-        uses: actions/cache@v4
+      - name: Cache pre-commit
+        uses: actions/cache@v5
         with:
           path: ~/.cache/pre-commit
           key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
 
-      - name: Run pre-commit hooks
+      - name: Run pre-commit
         run: pre-commit run --all-files --show-diff-on-failure
 
-      - name: Validate commit messages (PR only)
+      - name: Check PR title & commits
         if: github.event_name == 'pull_request'
         uses: amannn/action-semantic-pull-request@v5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  testing:
-    name: Testing
+  test:
+    name: Test
     needs: validate
-    if: github.event_name != 'issues'  # Skip on issues events
+    if: github.event_name != 'issues'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v6
 
-      - name: Test the action
-        id: testing
+      - name: Run action
+        id: action
         uses: ./
         with:
           who-to-greet: '${{ github.event_name }} Runner'
 
-      - name: Verify action outputs
+      - name: Verify outputs
         run: |
           echo "Event: ${{ github.event_name }}"
-          echo "Greeting time: ${{ steps.testing.outputs.time }}"
+          echo "Greeting time: ${{ steps.action.outputs.time }}"
 
-  release:
-    name: Release
-    needs: [validate, testing]
+  release-preview:
+    name: Release Preview
+    needs: [validate, test]
     runs-on: ubuntu-latest
     permissions:
-      contents: write          # Needed for real release (tag + release creation)
-      pull-requests: write     # For commenting on PRs
-      issues: write            # Optional, if needed
+      contents: write
+      pull-requests: write
     if: >
       github.event_name == 'push' ||
       github.event_name == 'pull_request' ||
       github.event_name == 'workflow_dispatch' ||
       github.event_name == 'schedule'
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
-          cache: 'npm'  # Optional: speeds up repeated installs
 
-      - name: Install semantic-release and plugins
+      - name: Cache npm
+        uses: actions/cache@v5
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('package.json') }}
+          restore-keys: ${{ runner.os }}-npm-
+
+      - name: Install release tools
         run: |
           npm install \
             semantic-release \
@@ -111,55 +114,111 @@ jobs:
             @semantic-release/git \
             conventional-changelog-conventionalcommits
 
-      - name: Run semantic-release dry-run
+      - name: Dry-run
         id: dry-run
         continue-on-error: true
         run: |
           DRY_OUTPUT="$(npx semantic-release --dry-run 2>&1)"
           EXIT_CODE="$?"
 
-          # Save full output as artifact for debugging
-          echo "$DRY_OUTPUT" > dry-run-full.log
+          echo "$DRY_OUTPUT" > dry-run.log
 
           if [ $EXIT_CODE -eq 0 ]; then
-            # Parse with Node script
-            node .github/scripts/parse-semantic-dry-run.js <<< "$DRY_OUTPUT" >> "$GITHUB_OUTPUT" || {
+            node .github/scripts/dry-release-evaluator.js <<< "$DRY_OUTPUT" >> "$GITHUB_OUTPUT" || {
               echo "status=failed" >> "$GITHUB_OUTPUT"
-              printf "result=%b\n" "**Parsing failed** — check workflow logs for dry-run-full.log artifact" >> "$GITHUB_OUTPUT"
+              printf "result=%b\n" "**Parser failed** — see dry-run.log artifact" >> "$GITHUB_OUTPUT"
             }
           else
             echo "status=failed" >> "$GITHUB_OUTPUT"
             ERROR_PREVIEW=$(echo "$DRY_OUTPUT" | tail -n 30)
-            printf "result=%b\n" "**Dry-run failed** (exit $EXIT_CODE)\n\nError preview:\n\`\`\`text\n$ERROR_PREVIEW\n\`\`\`" >> "$GITHUB_OUTPUT"
+            printf "result=%b\n" "**Dry-run failed** (code $EXIT_CODE)\n\n\`\`\`text\n$ERROR_PREVIEW\n\`\`\`" >> "$GITHUB_OUTPUT"
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload dry-run log artifact
+      - name: Upload dry-run log
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
-          name: semantic-dry-run-log
-          path: dry-run-full.log
+          name: dry-run-log
+          path: dry-run.log
           retention-days: 7
 
-      - name: Post dry-run result to PR (if applicable)
+      - name: Comment preview on PR
         if: github.event_name == 'pull_request' && always()
         uses: peter-evans/create-or-update-comment@v5
         with:
           issue-number: ${{ github.event.pull_request.number }}
           body: |
-            ### Release Dry-Run Outcome
+            ### Release Preview
             ${{ steps.dry-run.outputs.result }}
 
-      - name: Guard - only proceed to live release on qualifying events
-        if: steps.dry-run.outputs.status != 'passed' || ! (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'release')
-        run: |
-          echo "Skipping live release: dry-run failed or not on main/release trigger"
-          exit 0
+  release-guard:
+    name: Release Guard
+    needs: release-preview
+    runs-on: ubuntu-latest
+    if: >
+      needs.release-preview.result == 'success' &&
+      (github.event_name == 'push' && github.ref == 'refs/heads/main' ||
+       github.event_name == 'workflow_dispatch' ||
+       github.event_name == 'schedule' ||
+       github.event_name == 'release')
+    steps:
+      - name: Proceed check
+        run: echo "All conditions met → proceeding to release"
 
-      - name: Run semantic-release (live)
-        if: steps.dry-run.outputs.status == 'passed'  # Optional safety
+  release:
+    name: Release
+    needs: release-guard
+    if: needs.release-guard.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      - name: Install release tools
+        run: |
+          npm install \
+            semantic-release \
+            @semantic-release/commit-analyzer \
+            @semantic-release/release-notes-generator \
+            @semantic-release/changelog \
+            @semantic-release/github \
+            @semantic-release/git \
+            conventional-changelog-conventionalcommits
+
+      - name: Publish release
         run: npx semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  reporter:
+    name: Report Status
+    needs: [validate, test, release-preview, release-guard, release]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Summarize & report
+        run: |
+          node .github/scripts/workflow-reporter.js
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_ID: ${{ github.run_id }}
+          REPO: ${{ github.repository }}
+          SERVER_URL: ${{ github.server_url }}

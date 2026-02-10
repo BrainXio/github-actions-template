@@ -1,4 +1,4 @@
-// .github/scripts/parse-semantic-dry-run.js
+// .github/scripts/dry-release-evaluator.js
 // Parses semantic-release --dry-run output from stdin and outputs GitHub Actions outputs
 
 const fs = require('fs');
