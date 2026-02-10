@@ -39,7 +39,7 @@ pre-commit-update: ## Update pre-commit hook versions
 
 validate: ## Dry-run validation via act (if action.yml exists)
 	@if [ -f action.yml ]; then \
-		$(ACT_BIN) --dryrun -W .github/workflows/ci.yml $(ACT_ARGS); \
+		$(ACT_BIN) --dryrun -W .github/workflows/into-main.yml $(ACT_ARGS); \
 	else \
 		echo "No action.yml yet — skipping"; \
 	fi
@@ -49,25 +49,25 @@ validate: ## Dry-run validation via act (if action.yml exists)
 # ────────────────────────────────────────────────────────────────────────────────
 
 test-push: ## Test push event (default)
-	@$(ACT_BIN) push -W .github/workflows/ci.yml $(ACT_ARGS)
+	@$(ACT_BIN) push -W .github/workflows/into-main.yml $(ACT_ARGS)
 
 test-dispatch: ## Test manual workflow_dispatch
-	@$(ACT_BIN) workflow_dispatch -W .github/workflows/ci.yml $(ACT_ARGS)
+	@$(ACT_BIN) workflow_dispatch -W .github/workflows/into-main.yml $(ACT_ARGS)
 
 test-pr: ## Test pull_request event
-	@$(ACT_BIN) pull_request --eventpath .github/events/pull-request-local.json -W .github/workflows/ci.yml $(ACT_ARGS)
+	@$(ACT_BIN) pull_request --eventpath .github/events/pull-request-local.json -W .github/workflows/into-main.yml $(ACT_ARGS)
 
 test-issues: ## Test issues event
-	@$(ACT_BIN) issues -W .github/workflows/ci.yml $(ACT_ARGS)
+	@$(ACT_BIN) issues -W .github/workflows/into-main.yml $(ACT_ARGS)
 
 test-main: ## Test push to main branch
-	@$(ACT_BIN) push --eventpath .github/events/push-main.json -W .github/workflows/ci.yml $(ACT_ARGS)
+	@$(ACT_BIN) push --eventpath .github/events/push-main.json -W .github/workflows/into-main.yml $(ACT_ARGS)
 
 test-release: ## Test release published
-	@$(ACT_BIN) release -W .github/workflows/ci.yml $(ACT_ARGS)
+	@$(ACT_BIN) release -W .github/workflows/into-main.yml $(ACT_ARGS)
 
 test-schedule: ## Test scheduled event
-	@$(ACT_BIN) schedule -W .github/workflows/ci.yml $(ACT_ARGS)
+	@$(ACT_BIN) schedule -W .github/workflows/into-main.yml $(ACT_ARGS)
 
 tests: test-push test-dispatch test-pr test-issues test-main ## Run most common tests
 
