@@ -78,28 +78,35 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6.0.2
 
-      - name: Set up Node.js (if Node-based)
+      - name: Set up Node.js (pre-install if needed)
         if: matrix.lang == 'node'
         uses: actions/setup-node@v6.2.0
         with:
           node-version: ${{ matrix.node-version }}
 
-      - name: Set up Python (if Python-based)
+      - name: Set up Python (pre-install if needed)
         if: matrix.lang == 'python'
         uses: actions/setup-python@v6.2.0
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Run action
+      - name: Run action with selected language
         id: action
         uses: ./
         with:
           who-to-greet: '${{ github.event_name }} Runner'
+          language: ${{ matrix.lang }}
 
       - name: Verify outputs
         run: |
+          echo "Language variant: ${{ matrix.lang }}"
           echo "Event: ${{ github.event_name }}"
           echo "Greeting time: ${{ steps.action.outputs.time }}"
+          # Optional: add failure if output missing
+          if [ -z "${{ steps.action.outputs.time }}" ]; then
+            echo "Missing time output!" >&2
+            exit 1
+          fi
 
       - name: Set summary
         id: summary
@@ -107,10 +114,10 @@ jobs:
         run: |
           if [[ "${{ job.status }}" == "success" ]]; then
             echo "status=✅ success" >> "$GITHUB_OUTPUT"
-            echo "details=Action tests passed across matrices" >> "$GITHUB_OUTPUT"
+            echo "details=Action tests passed for ${{ matrix.lang }}" >> "$GITHUB_OUTPUT"
           else
             echo "status=❌ failed" >> "$GITHUB_OUTPUT"
-            echo "details=Action tests failed (see logs)" >> "$GITHUB_OUTPUT"
+            echo "details=Action test failed for ${{ matrix.lang }} (see logs)" >> "$GITHUB_OUTPUT"
           fi
 
   quality:

@@ -1,5 +1,5 @@
 name: 'Hello World Template'
-description: 'Simple hello-world composite action template'
+description: 'Simple hello-world template supporting bash, node, python runners'
 author: 'BrainXio'
 
 branding:
@@ -11,6 +11,10 @@ inputs:
     description: 'Name to greet'
     required: false
     default: 'World'
+  language:
+    description: 'Language variant to run (bash, node, python)'
+    required: false
+    default: 'bash'
 
 outputs:
   time:
@@ -19,7 +23,35 @@ outputs:
 runs:
   using: 'composite'
   steps:
-    - run: ${{ github.action_path }}/src/entrypoint.sh
+    - name: Run Bash variant
+      if: ${{ inputs.language == 'bash' }}
+      run: ${{ github.action_path }}/src/composite/main.sh
+      shell: bash
+      env:
+        INPUT_WHO_TO_GREET: ${{ inputs.who-to-greet }}
+
+    - name: Set up Node.js
+      if: ${{ inputs.language == 'node' }}
+      uses: actions/setup-node@v6.2.0
+      with:
+        node-version: '24'
+
+    - name: Run Node variant
+      if: ${{ inputs.language == 'node' }}
+      run: node ${{ github.action_path }}/src/node/main.js
+      shell: bash
+      env:
+        INPUT_WHO_TO_GREET: ${{ inputs.who-to-greet }}
+
+    - name: Set up Python
+      if: ${{ inputs.language == 'python' }}
+      uses: actions/setup-python@v6.2.0
+      with:
+        python-version: '3.14'
+
+    - name: Run Python variant
+      if: ${{ inputs.language == 'python' }}
+      run: python ${{ github.action_path }}/src/python/main.py
       shell: bash
       env:
         INPUT_WHO_TO_GREET: ${{ inputs.who-to-greet }}
