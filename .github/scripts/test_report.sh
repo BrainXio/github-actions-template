@@ -1,10 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "### Test" >> "$GITHUB_STEP_SUMMARY"
-echo "**Status**: ${{ env.JOB_STATUS == 'success' && '✅ Passed' || '❌ Failed' }}" >> "$GITHUB_STEP_SUMMARY"
+{
+  echo "### Test"
+  echo ""
 
-if [[ "${{ env.ACTION_OUTCOME }}" != "success" ]]; then
-  echo "" >> "$GITHUB_STEP_SUMMARY"
-  echo "**Issue**: Action execution or output verification failed" >> "$GITHUB_STEP_SUMMARY"
-fi
+  if [[ "${JOB_STATUS:-unknown}" == "success" ]]; then
+    echo "**Status**: ✅ Passed"
+  else
+    echo "**Status**: ❌ Failed"
+    echo ""
+    if [[ "${ACTION_OUTCOME:-failure}" != "success" ]]; then
+      echo "**Issue**: Action execution or output verification failed"
+    fi
+  fi
+
+  echo ""
+} >> "$GITHUB_STEP_SUMMARY"

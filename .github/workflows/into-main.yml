@@ -1,3 +1,4 @@
+# Full content of into-main.yml as per the last version
 name: Into Main
 
 on:
@@ -136,7 +137,6 @@ jobs:
         if: always()
         env:
           JOB_STATUS: ${{ job.status }}
-          DRY_EXIT: $?
         run: .github/scripts/release_preview_report.sh
 
   release-guard:

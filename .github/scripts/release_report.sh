@@ -2,12 +2,12 @@
 set -euo pipefail
 
 {
-  echo "### Release Guard"
+  echo "### Release"
   echo ""
   if [[ "${JOB_STATUS:-unknown}" == "success" ]]; then
-    echo "**Status**: ✅ Proceeding"
+    echo "**Status**: 🚀 Published"
   else
-    echo "**Status**: ⏭️ Skipped / Failed"
+    echo "**Status**: ❌ Failed"
   fi
   echo ""
 } >> "$GITHUB_STEP_SUMMARY"

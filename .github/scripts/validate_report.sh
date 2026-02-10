@@ -1,13 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "### Validate" >> "$GITHUB_STEP_SUMMARY"
-echo "**Status**: ${{ env.JOB_STATUS == 'success' && '✅ Passed' || '❌ Failed' }}" >> "$GITHUB_STEP_SUMMARY"
+{
+  echo "### Validate"
+  echo ""
 
-if [[ "${{ env.JOB_STATUS }}" != "success" ]]; then
-  echo "" >> "$GITHUB_STEP_SUMMARY"
-  echo "**Possible reasons**:" >> "$GITHUB_STEP_SUMMARY"
-  echo "- pre-commit hooks failed" >> "$GITHUB_STEP_SUMMARY"
-  echo "- Shellcheck warnings (ignored but logged)" >> "$GITHUB_STEP_SUMMARY"
-  echo "- Semantic PR title invalid" >> "$GITHUB_STEP_SUMMARY"
-fi
+  if [[ "${JOB_STATUS:-unknown}" == "success" ]]; then
+    echo "**Status**: ✅ Passed"
+  else
+    echo "**Status**: ❌ Failed"
+    echo ""
+    echo "**Possible reasons**:"
+    echo "- pre-commit hooks failed"
+    echo "- Shellcheck issues (warnings ignored but logged)"
+    echo "- Semantic PR title invalid (on pull requests)"
+  fi
+
+  echo ""
+} >> "$GITHUB_STEP_SUMMARY"
