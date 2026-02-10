@@ -134,7 +134,10 @@ jobs:
       - name: Dry-run
         id: dry-run
         continue-on-error: true
-        run: npx semantic-release --dry-run > dry-run.log 2>&1 || true
+        run: |
+          # Simulate main branch context for version prediction
+          export BRANCH_NAME=main
+          npx semantic-release --dry-run --no-ci > dry-run.log 2>&1 || true
 
       - name: Generate report
         id: report

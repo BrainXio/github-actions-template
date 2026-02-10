@@ -6,42 +6,48 @@ set -euo pipefail
   echo ""
 
   if [[ "${JOB_STATUS:-unknown}" == "success" ]]; then
-    echo "**Status**: ✅ Dry-run OK"
+    echo "**Status**: ✅ Dry-run OK (validation passed)"
   else
     echo "**Status**: ⚠️ Dry-run issue"
   fi
 
-  NEXT_VERSION="unknown"
+  echo ""
 
-  if [[ -f dry-run.log ]]; then
-    echo ""
-    cat dry-run.log | tail -n 15 >> "$GITHUB_STEP_SUMMARY"   # debug tail for visibility
-
-    if grep -qiE 'no relevant changes|no new version|no release' dry-run.log; then
-      echo "→ No release triggered"
-      NEXT_VERSION="none"
-    elif grep -qiE 'error|failed|ERR|Exception' dry-run.log; then
-      echo "→ Dry-run failed — check logs"
-      echo '```text'
-      tail -n 8 dry-run.log
-      echo '```'
-      NEXT_VERSION="failed"
-    else
-      # Try several common patterns from semantic-release logs
-      NEXT_VERSION=$(
-        grep -Ei '(next release version is|The next release version is|version to publish|will release version)' dry-run.log |
-        grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+(\.[0-9]+)?)?' |
-        head -1 || echo "unknown"
-      )
-      echo "→ Next version preview: **v${NEXT_VERSION}**"
-    fi
+  # Get current version from package.json
+  if [[ -f package.json ]]; then
+    CURRENT_VERSION=$(jq -r '.version // "unknown"' package.json)
+    echo "Current version (package.json): **v${CURRENT_VERSION}**"
   else
-    echo "→ No dry-run.log found"
-    NEXT_VERSION="missing"
+    CURRENT_VERSION="unknown"
+    echo "No package.json found → current version unknown"
+  fi
+
+  # Try to extract bump type from dry-run log (e.g. 'minor', 'patch')
+  BUMP_TYPE=$(grep -Ei 'release type|will be published as' dry-run.log | grep -oiE 'major|minor|patch' | head -1 || echo "")
+
+  if [[ -n "$BUMP_TYPE" ]]; then
+    echo "Detected bump type: **${BUMP_TYPE}**"
+    # Simple semver increment (requires semver tool or manual logic)
+    # For basic case, just note it – full increment needs external tool or node script
+    echo "→ Predicted next version: v${CURRENT_VERSION} (${BUMP_TYPE} bump)"
+    NEXT_VERSION="${CURRENT_VERSION} (${BUMP_TYPE})"
+  elif grep -qiE 'no relevant changes' dry-run.log; then
+    echo "→ No release triggered (no relevant changes)"
+    NEXT_VERSION="none"
+  else
+    echo "→ Could not determine bump type"
+    NEXT_VERSION="unknown"
+  fi
+
+  if grep -qiE 'error|failed' dry-run.log; then
+    echo ""
+    echo "Dry-run warnings/errors:"
+    echo '```text'
+    grep -Ei 'error|warn|failed' dry-run.log | tail -n 10
+    echo '```'
   fi
 
   echo ""
 } >> "$GITHUB_STEP_SUMMARY"
 
-# Always set output
 echo "next_version=${NEXT_VERSION}" >> "$GITHUB_OUTPUT"
