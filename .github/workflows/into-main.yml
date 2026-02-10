@@ -135,9 +135,13 @@ jobs:
         id: dry-run
         continue-on-error: true
         run: |
-          npx semantic-release --dry-run --noop > dry-run.log 2>&1
-          # Try to extract from log as fallback
-          NEXT_VERSION=$(grep -E 'The next release version is|next release version is' dry-run.log | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?' | tail -1 || echo "unknown")
+          git fetch --tags --force --prune
+
+          # Force semantic-release to allow this branch for dry-run
+          npx semantic-release --dry-run --branches "$GITHUB_REF_NAME" > dry-run.log 2>&1 || true
+
+          # Extract version
+          NEXT_VERSION=$(grep -Ei 'next release version is' dry-run.log | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?' | tail -1 || echo "unknown")
           echo "next_version=$NEXT_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Generate report
