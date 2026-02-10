@@ -1,8 +1,8 @@
-# CI + Release Workflow (ci.yml)
+# CI + Release Workflow (into-main.yml)
 
 ## Introduction and Purpose
 
-The `ci.yml` workflow is the core automation pipeline for this GitHub Actions template repository. It serves multiple purposes:
+The `into-main.yml` workflow is the core automation pipeline for this GitHub Actions template repository. It serves multiple purposes:
 - **Continuous Integration (CI)**: Ensures code quality through linting, testing, and validation on every relevant event.
 - **Release Management**: Automates semantic versioning, changelog generation, and GitHub releases using conventional commits.
 - **Dry-Run Preview**: Provides visibility into potential releases without actually publishing them.

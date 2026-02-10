@@ -1,0 +1,3 @@
+# .actionlint.yaml (optional)
+self-hosted-runner: {}
+ignore: ['property ".*" is not defined in object type {} [expression]']   # broad ignore, use sparingly

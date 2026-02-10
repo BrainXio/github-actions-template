@@ -22,7 +22,7 @@ Curiosity. Freedom. Creation.
 - **Workflow & automation**
   `Makefile` → main commands (setup, lint, test-*, secrets, pre-commit)
   `.pre-commit-config.yaml` → automatic pre-commit checks
-  `.github/workflows/ci.yml` → main CI + release pipeline
+  `.github/workflows/into-main.yml` → main CI + release pipeline
   `.github/workflows/issue-triage.yml` → optional issue auto-label & welcome
 
 - **Documentation**
@@ -51,6 +51,10 @@ make tests         # run all common event tests
 ```
 
 Full command list: `make help`
+
+## Changelog
+
+See full release notes on GitHub: [releases](https://github.com/BrainXio/github-actions-template/releases)
 
 ## Developer Guide
 

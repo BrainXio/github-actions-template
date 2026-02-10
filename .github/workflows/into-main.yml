@@ -1,0 +1,257 @@
+name: Into Main
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  issues:
+    types: [opened, edited]
+  release:
+    types: [published]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  statuses: write
+  id-token: write          # optional – useful for future OIDC auth
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Lint bash scripts
+        run: shellcheck --shell=bash src/*.sh .devcontainer/*.sh || true
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install pre-commit
+        run: pip install pre-commit
+
+      - name: Cache pre-commit
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+
+      - name: Run pre-commit
+        run: pre-commit run --all-files --show-diff-on-failure
+
+      - name: Check PR title & commits
+        if: github.event_name == 'pull_request'
+        uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate report
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: .github/scripts/validate_report.sh
+
+  test:
+    name: Test
+    needs: validate
+    if: github.event_name != 'issues'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run action
+        id: action
+        uses: ./
+        with:
+          who-to-greet: '${{ github.event_name }} Runner'
+
+      - name: Verify outputs
+        run: |
+          echo "Event: ${{ github.event_name }}"
+          echo "Greeting time: ${{ steps.action.outputs.time }}"
+
+      - name: Generate report
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+          ACTION_OUTCOME: ${{ steps.action.outcome }}
+        run: .github/scripts/test_report.sh
+
+  release-preview:
+    name: Release Preview
+    needs: [validate, test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    if: github.event_name != 'release'  # no need to run preview during published release event
+    outputs:
+      next_version: ${{ steps.extract-version.outputs.next_version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install release tools
+        run: |
+          npm install --no-save \
+            semantic-release \
+            @semantic-release/commit-analyzer \
+            @semantic-release/release-notes-generator \
+            @semantic-release/changelog \
+            @semantic-release/github \
+            @semantic-release/git \
+            conventional-changelog-conventionalcommits
+
+      - name: Dry-run semantic-release & extract next version
+        id: extract-version
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          echo "Running semantic-release dry-run..."
+          DRY_OUTPUT=$(npx semantic-release --dry-run 2>&1) || true
+
+          echo "$DRY_OUTPUT" > dry-run.log
+          echo "=== Full dry-run output (for debugging) ==="
+          cat dry-run.log
+          echo "========================================"
+
+          # Robust extraction: match version including prerelease tags
+          NEXT_VERSION=$(echo "$DRY_OUTPUT" | \
+            grep -oE 'The next release version is [0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9\.]*)?' | \
+            awk '{print $5}' || echo "")
+
+          # Fallback: grab the last semver-like string if above fails
+          if [[ -z "$NEXT_VERSION" ]]; then
+            NEXT_VERSION=$(echo "$DRY_OUTPUT" | \
+              grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9\.]*)?' | \
+              tail -n 1 || echo "no-release-pending")
+          fi
+
+          # Normalize empty → no-release-pending
+          [[ -z "$NEXT_VERSION" ]] && NEXT_VERSION="no-release-pending"
+
+          echo "Extracted next version: $NEXT_VERSION"
+          echo "next_version=$NEXT_VERSION" >> "$GITHUB_OUTPUT"
+
+  release-guard:
+    name: Release Guard
+    needs: release-preview
+    runs-on: ubuntu-latest
+    if: >
+      needs.release-preview.result == 'success' &&
+      (github.event_name == 'push' && github.ref == 'refs/heads/main' ||
+       github.event_name == 'workflow_dispatch' ||
+       github.event_name == 'schedule' ||
+       github.event_name == 'release')
+    steps:
+      - name: Proceed check
+        run: echo "All conditions met → proceeding to release"
+
+      - name: Generate report
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: .github/scripts/release_guard_report.sh
+
+  release:
+    name: Release
+    needs: release-guard
+    if: needs.release-guard.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install release tools
+        run: |
+          npm install --no-save \
+            semantic-release \
+            @semantic-release/commit-analyzer \
+            @semantic-release/release-notes-generator \
+            @semantic-release/changelog \
+            @semantic-release/github \
+            @semantic-release/git \
+            conventional-changelog-conventionalcommits
+
+      - name: Publish release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx semantic-release
+
+      - name: Generate report
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: .github/scripts/release_report.sh
+
+  reporter:
+    name: Report Status
+    needs: [validate, test, release-preview, release-guard, release]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Summarize & report
+        id: report
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_ID: ${{ github.run_id }}
+          REPO: ${{ github.repository }}
+          SERVER_URL: ${{ github.server_url }}
+          VALIDATE_STATUS: ${{ needs.validate.result == 'success' && '✅' || '❌' }}
+          TEST_STATUS:     ${{ needs.test.result     == 'success' && '✅' || '❌' }}
+          PREVIEW_STATUS:  ${{ needs['release-preview'].result == 'success' && '✅' || '⚠️' }}
+          GUARD_STATUS:    ${{ needs['release-guard'].result == 'success' && '✅' || '⏭️' }}
+          RELEASE_STATUS:  ${{ needs.release.result   == 'success' && '🚀' || '❌' }}
+          VALIDATE_RESULT: ${{ needs.validate.result || 'skipped' }}
+          TEST_RESULT:     ${{ needs.test.result     || 'skipped' }}
+          PREVIEW_RESULT:  ${{ needs['release-preview'].result || 'skipped' }}
+          GUARD_RESULT:    ${{ needs['release-guard'].result || 'skipped' }}
+          RELEASE_RESULT:  ${{ needs.release.result   || 'skipped' }}
+          NEXT_VERSION:    ${{ needs['release-preview'].outputs.next_version || 'no-release-pending' }}
+        run: .github/scripts/workflow_report.sh
+
+      - name: Post or update PR comment
+        if: github.event_name == 'pull_request' && always()
+        uses: peter-evans/create-or-update-comment@v5
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body-file: reporter-comment.md
+          edit-mode: replace
