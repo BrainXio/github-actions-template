@@ -208,26 +208,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Summarize & report
+      - name: Generate report body
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          EVENT_NAME: ${{ github.event_name }}
-          RUN_ID: ${{ github.run_id }}
-          REPO: ${{ github.repository }}
-          SERVER_URL: ${{ github.server_url }}
+          GITHUB_TOKEN:           ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER:              ${{ github.event.pull_request.number }}
+          EVENT_NAME:             ${{ github.event_name }}
+          RUN_ID:                 ${{ github.run_id }}
+          REPO:                   ${{ github.repository }}
+          SERVER_URL:             ${{ github.server_url }}
+          NEEDS_VALIDATE_RESULT:        ${{ needs.validate.result }}
+          NEEDS_TEST_RESULT:            ${{ needs.test.result }}
+          NEEDS_RELEASE_PREVIEW_RESULT: ${{ needs.release-preview.result }}
+          NEEDS_RELEASE_GUARD_RESULT:   ${{ needs.release-guard.result }}
+          NEEDS_RELEASE_RESULT:         ${{ needs.release.result }}
+        run: .github/scripts/workflow_report.sh
 
-          # Pre-compute status emojis in YAML (safe here)
-          VALIDATE_STATUS: ${{ needs.validate.result == 'success' && '✅' || '❌' }}
-          TEST_STATUS:     ${{ needs.test.result     == 'success' && '✅' || '❌' }}
-          PREVIEW_STATUS:  ${{ needs['release-preview'].result == 'success' && '✅' || '⚠️' }}
-          GUARD_STATUS:    ${{ needs['release-guard'].result == 'success' && '✅' || '⏭️' }}
-          RELEASE_STATUS:  ${{ needs.release.result   == 'success' && '🚀' || '❌' }}
-
-          # Pass results directly (fallback to 'skipped' if job didn't run)
-          VALIDATE_RESULT: ${{ needs.validate.result || 'skipped' }}
-          TEST_RESULT:     ${{ needs.test.result     || 'skipped' }}
-          PREVIEW_RESULT:  ${{ needs['release-preview'].result || 'skipped' }}
-          GUARD_RESULT:    ${{ needs['release-guard'].result || 'skipped' }}
-          RELEASE_RESULT:  ${{ needs.release.result   || 'skipped' }}
-        run: .github/scripts/workflow_reporter.sh
+      - name: Post or update PR comment
+        if: github.event_name == 'pull_request' && always()
+        uses: peter-evans/create-or-update-comment@v5
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body-file: reporter-comment.md
+          edit-mode: replace
