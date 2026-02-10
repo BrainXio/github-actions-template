@@ -86,7 +86,7 @@ jobs:
       - name: Lint JavaScript files (ESLint)
         run: |
           set -euo pipefail
-          npm install --no-save eslint@9 @eslint/js globals
+          npm install --no-save eslint@9.13.0 @eslint/js@9.13.0 globals@15
           files="${{ needs.check.outputs.js_files }}"
           if [[ -n "$files" ]]; then
             npx eslint --format stylish $files
