@@ -16,6 +16,8 @@ SUMMARY="# Workflow Summary – ${EVENT_NAME^}
 **Run**: [#${RUN_ID}](${SERVER_URL}/${REPO}/actions/runs/${RUN_ID})
 **Last updated**: $(date -u +"%Y-%m-%d %H:%M UTC")
 
+**Next Release Preview**: v${NEXT_VERSION:-unknown}
+
 ## Job Results
 
 | Job              | Status     | Result                  |
