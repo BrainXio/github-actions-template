@@ -11,20 +11,28 @@ set -euo pipefail
     echo "**Status**: ⚠️ Dry-run issue"
   fi
 
+  NEXT_VERSION="unknown"
+
   if [[ -f dry-run.log ]]; then
     echo ""
-    if grep -qiE 'no relevant changes|no new version' dry-run.log; then
+    cat dry-run.log | tail -n 15 >> "$GITHUB_STEP_SUMMARY"   # debug tail for visibility
+
+    if grep -qiE 'no relevant changes|no new version|no release' dry-run.log; then
       echo "→ No release triggered"
       NEXT_VERSION="none"
-    elif grep -qiE 'error|failed|ERR' dry-run.log; then
+    elif grep -qiE 'error|failed|ERR|Exception' dry-run.log; then
       echo "→ Dry-run failed — check logs"
       echo '```text'
       tail -n 8 dry-run.log
       echo '```'
       NEXT_VERSION="failed"
     else
-      # More specific grep for semantic-release output
-      NEXT_VERSION=$(grep -Ei 'next release version is' dry-run.log | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[a-z0-9]+(\.[0-9]+)?)?' | head -1 || echo "unknown")
+      # Try several common patterns from semantic-release logs
+      NEXT_VERSION=$(
+        grep -Ei '(next release version is|The next release version is|version to publish|will release version)' dry-run.log |
+        grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+(\.[0-9]+)?)?' |
+        head -1 || echo "unknown"
+      )
       echo "→ Next version preview: **v${NEXT_VERSION}**"
     fi
   else
@@ -35,5 +43,5 @@ set -euo pipefail
   echo ""
 } >> "$GITHUB_STEP_SUMMARY"
 
-# Set as job output for reporter
+# Always set output
 echo "next_version=${NEXT_VERSION}" >> "$GITHUB_OUTPUT"

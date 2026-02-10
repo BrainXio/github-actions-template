@@ -95,7 +95,7 @@ jobs:
       contents: write
       pull-requests: write
     outputs:
-          next_version: ${{ steps.report.outputs.next_version }}
+      next_version: ${{ steps.report.outputs.next_version }}
     if: >
       github.event_name == 'push' ||
       github.event_name == 'pull_request' ||
